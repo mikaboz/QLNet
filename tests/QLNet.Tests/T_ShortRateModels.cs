@@ -72,7 +72,7 @@ namespace TestSuite
                                     new CalibrationData( 5, 1, 0.1000 )};
          IborIndex index = new Euribor6M(termStructure);
 
-         IPricingEngine engine = new JamshidianSwaptionEngine(model);
+         IPricingEngine engine = new JamshidianSwaptionEngine(model,termStructure);
 
          List<CalibrationHelper> swaptions = new List<CalibrationHelper>();
          for (int i=0; i<data.Length; i++) {

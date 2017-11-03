@@ -19,6 +19,7 @@
 */
 
 using System;
+using System.Linq;
 
 namespace QLNet
 {
@@ -28,38 +29,40 @@ namespace QLNet
    public abstract class OneFactorModel : ShortRateModel
    {
       protected OneFactorModel(int nArguments) : base(nArguments)
-      {}
+      { }
 
       //! Base class describing the short-rate dynamics
-      public abstract class ShortRateDynamics
+      public new class Dynamics : ShortRateModel.Dynamics
       {
-         private StochasticProcess1D process_;
-         //! Returns the risk-neutral dynamics of the state variable
-         public StochasticProcess1D process()
+         public StochasticProcess1D Process { get; set; }
+         public Dynamics(StochasticProcess1D process)
          {
-            return process_;
-         }
-
-         protected ShortRateDynamics(StochasticProcess1D process)
-         {
-            process_ = process;
+            Process = process;
          }
 
          //! Compute state variable from short rate
-         public abstract double variable(double t, double r);
-
+         //public abstract double variable(double t, double rate);
+         public override double shortRate(double t, Vector variables)
+         {
+            return shortRate(t, variables[0]);
+         }
          //! Compute short rate from state variable
-         public abstract double shortRate(double t, double variable);
+         public virtual double shortRate(double t, double variable)
+         {
+            return variable;
+         }
+         public override double variable(double t, double r)
+         {
+            return r;
+         }
       }
-
-      //! returns the short-rate dynamics
-      public abstract ShortRateDynamics dynamics();
 
       //! Return by default a trinomial recombining tree
       public override Lattice tree(TimeGrid grid)
       {
-         TrinomialTree trinomial = new TrinomialTree(dynamics().process(), grid);
-         return new ShortRateTree(trinomial, dynamics(), grid);
+         OneFactorModel.Dynamics dyn = (OneFactorModel.Dynamics)dynamics();
+         TrinomialTree trinomial = new TrinomialTree(dyn.Process, grid,false);
+         return new ShortRateTree(trinomial, dyn, grid);
       }
 
       //! Recombining trinomial tree discretizing the state variable
@@ -71,19 +74,15 @@ namespace QLNet
          }
 
          //! Plain tree build-up from short-rate dynamics
-         public ShortRateTree(TrinomialTree tree,
-            ShortRateDynamics dynamics,
-            TimeGrid timeGrid)
-            : base(timeGrid, tree.size(1))
+         public ShortRateTree(TrinomialTree tree, Dynamics dynamics, TimeGrid timeGrid) :
+            base(timeGrid, tree.size(1))
          {
             tree_ = tree;
             dynamics_ = dynamics;
          }
-
          //! Tree build-up + numerical fitting to term-structure
-         public ShortRateTree(TrinomialTree tree,ShortRateDynamics dynamics,TermStructureFittingParameter.NumericalImpl theta,
-            TimeGrid timeGrid)
-            : base(timeGrid, tree.size(1))
+         public ShortRateTree(TrinomialTree tree, Dynamics dynamics,TermStructureFittingParameter.NumericalImpl theta, TimeGrid timeGrid) :
+            base(timeGrid, tree.size(1))
          {
             tree_ = tree;
             dynamics_ = dynamics;
@@ -130,7 +129,7 @@ namespace QLNet
          }
 
          private TrinomialTree tree_;
-         private ShortRateDynamics dynamics_;
+         private Dynamics dynamics_;
 
          public class Helper : ISolver1d
          {
@@ -167,41 +166,46 @@ namespace QLNet
       }
    }
 
-   public abstract class OneFactorAffineModel : OneFactorModel,
-      IAffineModel
+   public abstract class OneFactorAffineModel : OneFactorModel, IAffineShortRateModel
    {
+      #region Constructor
       protected OneFactorAffineModel(int nArguments)
          : base(nArguments)
       {}
-
-      public virtual double discountBond(double now,
-         double maturity,
-         Vector factors)
+      #endregion
+      #region IAffineModel implémentation et adaptation 1D
+      public abstract double A(double t, double T);
+      public Vector Bvect(double t, double T)
       {
-         return discountBond(now, maturity, factors[0]);
+         double[] b = new double[] { B(t, T) };
+         return new Vector(b);
       }
-
-      public double discountBond(double now, double maturity, double rate)
-      {
-         return A(now, maturity) * Math.Exp(-B(now, maturity) * rate);
-      }
-
-      public double discount(double t)
-      {
-         double x0 = dynamics().process().x0();
-         double r0 = dynamics().shortRate(0.0, x0);
-         return discountBond(0.0, t, r0);
-      }
-
-      public virtual double discountBondOption(Option.Type type,
-         double strike,
-         double maturity,
-         double bondMaturity)
+      public abstract double B(double t, double T);
+      public virtual double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity)
       {
          throw new NotImplementedException();
       }
-
-      protected abstract double A(double t, double T);
-      protected abstract double B(double t, double T);
+      public double Discount(double t)
+      {
+         OneFactorModel.Dynamics Dynamics = (OneFactorModel.Dynamics)dynamics();
+         Vector vec = new Vector(1)
+         {
+            [0] = Dynamics.shortRate(0.0, Dynamics.Process.x0())
+         };
+         return ((IAffineShortRateModel)this).DiscountBond(0.0, t, vec);
+      }
+      public double DiscountBond(double t, double T, Vector factors)
+      {
+         return A(t, T) * Math.Exp(-(Bvect(t, T) * factors));
+      }
+      public double DiscountBond(double t, double T, double rate)
+      {
+         Vector v = new Vector(1)
+         {
+            [0] = rate
+         };
+         return DiscountBond(t, T, v);
+      }
+      #endregion
    }
 }

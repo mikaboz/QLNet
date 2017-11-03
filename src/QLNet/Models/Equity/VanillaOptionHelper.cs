@@ -19,9 +19,9 @@ using System.Collections.Generic;
 namespace QLNet
 {
    //! calibration helper for Heston model
-   public class HestonModelHelper : CalibrationHelper
+   public class VanillaOptionHelper : CalibrationHelper
    {
-      public HestonModelHelper( Period maturity,
+      public VanillaOptionHelper( Period maturity,
                                 Calendar calendar,
                                 double s0,
                                 double strikePrice,
@@ -40,7 +40,7 @@ namespace QLNet
          dividendYield.registerWith(update);
       }
 
-      public HestonModelHelper( Period maturity,
+      public VanillaOptionHelper( Period maturity,
                                 Calendar calendar,
                                 Handle<Quote> s0,
                                 double strikePrice,

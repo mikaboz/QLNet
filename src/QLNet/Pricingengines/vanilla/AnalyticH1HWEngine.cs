@@ -67,8 +67,8 @@ namespace QLNet
             double strike, int j)
          {
             j_ = j;
-            lambda_ = hullWhiteModel.a();
-            eta_ = hullWhiteModel.sigma();
+            lambda_ = hullWhiteModel.Kappa;
+            eta_ = hullWhiteModel.Sigma;
             v0_ = hestonModel.link.v0();
             kappa_ = hestonModel.link.kappa();
             theta_ = hestonModel.link.theta();

@@ -55,7 +55,8 @@ namespace QLNet {
             process_.registerWith(update);
         }
 
-        public override void calculate() {
+        public override void calculate()
+      {
 
             Utils.QL_REQUIRE(arguments_.exercise.type() == Exercise.Type.European,()=> "not an European option");
 

@@ -35,7 +35,6 @@ namespace QLNet
    */
    public class GeneralizedBlackScholesProcess : StochasticProcess1D
    {
-
       public GeneralizedBlackScholesProcess( Handle<Quote> x0, Handle<YieldTermStructure> dividendTS,
          Handle<YieldTermStructure> riskFreeTS, Handle<BlackVolTermStructure> blackVolTS, IDiscretization1D disc = null )
          : base( disc ?? new EulerDiscretization() )

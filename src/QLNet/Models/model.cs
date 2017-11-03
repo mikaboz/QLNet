@@ -18,6 +18,7 @@
 */
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace QLNet {
     //! Affine model class
@@ -46,17 +47,26 @@ namespace QLNet {
         }
     }
 
-    //Affince Model Interface used for multihritage in 
-    //liborforwardmodel.cs & analyticcapfloorengine.cs
-    public interface IAffineModel : IObservable
-    {
-        double discount(double t);
-        double discountBond(double now, double maturity, Vector factors);
-        double discountBondOption(Option.Type type, double strike, double maturity, double bondMaturity);
-    }
+   //Affince Model Interface used for multihritage in 
+   //liborforwardmodel.cs & analyticcapfloorengine.cs
+   /// <summary>
+   /// modèles du type P(t,T) = A(t,T) * exp(- B(t,T) * x(t,T) )
+   /// </summary>
+   ///
+   public interface IAffineModel : IObservable
+   {
+      double Discount(double t);
+      double DiscountBond(double t, double T, Vector factors);
+      double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity);
+   }
+   public interface IAffineShortRateModel : IAffineModel
+   {
+      double A(double t, double T);
+      Vector Bvect(double t, double T);
+   }
 
-    //TermStructureConsistentModel used in analyticcapfloorengine.cs
-    public class TermStructureConsistentModel : IObservable
+   //TermStructureConsistentModel used in analyticcapfloorengine.cs
+   public class TermStructureConsistentModel : IObservable
     {
         public TermStructureConsistentModel(Handle<YieldTermStructure> termStructure)
         {
@@ -84,28 +94,48 @@ namespace QLNet {
         }
     }
 
-    //ITermStructureConsistentModel used ins shortratemodel blackkarasinski.cs/hullwhite.cs
-    public interface ITermStructureConsistentModel
-    {
-        Handle<YieldTermStructure> termStructure();
-        Handle<YieldTermStructure> termStructure_ { get; set; }
-        void notifyObservers();
-        event Callback notifyObserversEvent;
-        void registerWith(Callback handler);
-        void unregisterWith(Callback handler);
-        void update();
-    }
-    
-    //! Calibrated model class
-    public class CalibratedModel : IObserver, IObservable {
+   //ITermStructureConsistentModel used ins shortratemodel blackkarasinski.cs/hullwhite.cs
+   public class FittingDynamics<T> : ShortRateModel.Dynamics
+      where T : ShortRateModel.Dynamics
+   {
+      TermStructureFittingParameter phi_;
+      T underlyingDynamics_;
+      public FittingDynamics(T underlyingDynamics, TermStructureFittingParameter phi)
+      {
+         underlyingDynamics_ = underlyingDynamics;
+         phi_ = phi;
+      }
+      public override double shortRate(double t, Vector variables)
+      {
+         return underlyingDynamics_.shortRate(t, variables) + phi_.value(t);
+      }
+      public override double variable(double t, double r)
+      {
+         throw new NotImplementedException();
+      }
+   }
+   public interface ITermStructureConsistentModel: IObservable, IObserver
+   {
+      Handle<YieldTermStructure> TermStructure { get; }
+   }
+   public static class TermStructureConsistentModelExtensions
+   {
+      public static double TermStructureInitialForwardRate(this ITermStructureConsistentModel model, double t)
+      {
+         return model.TermStructure.link.forwardRate(t, t, Compounding.Continuous, Frequency.NoFrequency).rate();
+      }
+   }
+
+   //! Calibrated model class
+   public class CalibratedModel : IObserver, IObservable {
         protected List<Parameter> arguments_;
+         public List<Parameter> Arguments { get { return arguments_; } }
 
         protected Constraint constraint_;
         public Constraint constraint() { return constraint_; }
         
         protected EndCriteria.Type shortRateEndCriteria_;
         public EndCriteria.Type endCriteria() { return shortRateEndCriteria_; }
-
 
         public CalibratedModel(int nArguments) {
             arguments_ = new InitializedList<Parameter>(nArguments);
@@ -213,7 +243,6 @@ namespace QLNet {
                     }
                     return true;
                 }
-
                public Vector upperBound(Vector parameters)
                {
                   int k = 0, k2 = 0;
@@ -222,7 +251,6 @@ namespace QLNet {
                   {
                      totalSize += arguments_[i].size();
                   }
-                
                   Vector result = new Vector(totalSize);
                   for (int i = 0; i < arguments_.Count; i++) 
                   {
@@ -335,11 +363,32 @@ namespace QLNet {
         #endregion
     }
 
-    //! Abstract short-rate model class
-    /*! \ingroup shortrate */
-    public abstract class ShortRateModel : CalibratedModel {
-       protected ShortRateModel(int nArguments) : base(nArguments) { }
+    public abstract class ShortRateModel : CalibratedModel
+   {
+      /// <summary>
+      /// Constructor adapted for OneFactorModel
+      /// </summary>
+      protected ShortRateModel(int nArguments) :
+         base(nArguments)
+      { }
+      /// <summary>
+      /// Constructor adapted for MultiFactorModel
+      /// </summary>
+      protected ShortRateModel(IEnumerable<OneFactorModel> factors) :
+         base(factors.Sum(x=>x.Arguments.Count))
+      {
 
-        public abstract Lattice tree(TimeGrid t);
-    }
+      }
+      public abstract Lattice tree(TimeGrid t);
+
+      public abstract Dynamics dynamics();
+      public abstract class Dynamics
+      {
+         //! Compute state variable from short rate
+         public abstract double variable(double t, double r);
+
+         //! Compute short rate from state variable
+         public abstract double shortRate(double t, Vector variables);
+      }
+   }
 }

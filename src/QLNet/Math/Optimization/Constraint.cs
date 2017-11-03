@@ -95,6 +95,34 @@ namespace QLNet
       public NoConstraint() : base( new Impl() ) { }
    };
 
+   /*
+   public class TimeDependentConstraint : Constraint
+   {
+      protected TimeDependentConstraint(TimeDependentConstraint.Impl impl) :
+         base(impl)
+      { }
+
+         protected abstract class Impl : IConstraint
+      {
+         private double t_;
+         public Impl(double t)
+         {
+            t_ = t;
+         }
+         public Vector lowerBound(Vector parameters)
+         {
+            return new Vector(parameters.size(), Double.MaxValue);
+         }
+
+         public abstract bool test(Vector param);
+
+         public Vector upperBound(Vector parameters)
+         {
+            return new Vector(parameters.size(), Double.MaxValue);
+         }
+      }
+   }
+   */
    //! %Constraint imposing positivity to all arguments
    public class PositiveConstraint : Constraint
    {

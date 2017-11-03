@@ -197,7 +197,7 @@ namespace QLNet
 
       public double numeraire(double t, Vector x)
       {
-         return hullWhiteModel_.discountBond( t, T_, x[2] ) / endDiscount_;
+         return hullWhiteModel_.DiscountBond( t, T_, x[2] ) / endDiscount_;
       }
 
       public HestonProcess hestonProcess() { return hestonProcess_; }

@@ -105,7 +105,7 @@ namespace TestSuite
                Handle<Quote> vol = new Handle<Quote>(new SimpleQuote(v[s*8+m]));
 
                Period maturity = new Period((int)((t[m]+3)/7.0), TimeUnit.Weeks); // round to weeks
-               options.Add( new HestonModelHelper(maturity, calendar,s0, strike[s], vol,riskFreeTS, dividendYield,
+               options.Add( new VanillaOptionHelper(maturity, calendar,s0, strike[s], vol,riskFreeTS, dividendYield,
                                           CalibrationHelper.CalibrationErrorType.ImpliedVolError));
             }
          }
@@ -165,7 +165,7 @@ namespace TestSuite
                                     / riskFreeTS.link.discount(tau);
                   double strikePrice = fwdPrice * Math.Exp(-moneyness * volatility * Math.Sqrt(tau));
 
-                  options.Add( new HestonModelHelper(optionMaturities[i], calendar,s0, strikePrice, vol,
+                  options.Add( new VanillaOptionHelper(optionMaturities[i], calendar,s0, strikePrice, vol,
                      riskFreeTS, dividendTS));
                }
             }

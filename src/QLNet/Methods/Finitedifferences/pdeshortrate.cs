@@ -23,24 +23,24 @@ namespace QLNet
 {
    public class PdeShortRate : PdeSecondOrderParabolic
    {
-      private OneFactorModel.ShortRateDynamics dynamics_;
+      private OneFactorModel.Dynamics dynamics_;
 
       public PdeShortRate()
       {} // required for geerics
 
-      public PdeShortRate(OneFactorModel.ShortRateDynamics d)
+      public PdeShortRate(OneFactorModel.Dynamics d)
       {
          dynamics_ = d;
       }
 
       public override double diffusion(double t, double x)
       {
-         return dynamics_.process().diffusion(t, x);
+         return dynamics_.Process.diffusion(t, x);
       }
 
       public override double drift(double t, double x)
       {
-         return dynamics_.process().drift(t, x);
+         return dynamics_.Process.drift(t, x);
       }
 
       public override double discount(double t, double x)

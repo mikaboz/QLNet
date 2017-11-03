@@ -29,24 +29,22 @@ namespace QLNet
        \warning The engine assumes that the exercise date equals the
                 start date of the passed swap.
    */
-   public class G2SwaptionEngine : GenericModelEngine<G2, Swaption.Arguments,
-                                                           Swaption.Results> {
+   public class G2SwaptionEngine : GenericModelEngine<G2, Swaption.Arguments, Swaption.Results>
+   {
         double range_;
         int intervals_;
-      
-        // range is the number of standard deviations to use in the
-        // exponential term of the integral for the european swaption.
-        // intervals is the number of intervals to use in the integration.
-        public G2SwaptionEngine(G2 model,
-                         double range,
-                         int intervals)
-        : base(model){
 
-            range_ = range;
-            intervals_ = intervals;
-        }
+      /// <param name="range">number of standard deviations to use in the exponential term of the integral for the european swaption.</param>
+      /// <param name="intervals">umber of intervals to use in the integration.</param>
+      public G2SwaptionEngine(G2 model, double range, int intervals) :
+         base(model)
+      {
+         range_ = range;
+         intervals_ = intervals;
+      }
 
-        public override void calculate() {
+      public override void calculate()
+      {
             Utils.QL_REQUIRE(arguments_.settlementType == Settlement.Type.Physical,()=> 
                "cash-settled swaptions not priced with G2 engine");
 
@@ -54,7 +52,7 @@ namespace QLNet
             // floating leg (which is not taken into account by the
             // model)
             VanillaSwap swap = arguments_.swap;
-            swap.setPricingEngine(new DiscountingSwapEngine(model_.link.termStructure()));
+            swap.setPricingEngine(new DiscountingSwapEngine(model_.link.TermStructure));
             double correction = swap.spread *
                 Math.Abs(swap.floatingLegBPS() / swap.fixedLegBPS());
             double fixedRate = swap.fixedRate - correction;

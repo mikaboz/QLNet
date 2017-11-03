@@ -31,9 +31,7 @@ namespace QLNet
         LiborForwardModelProcess process_;
         SwaptionVolatilityMatrix swaptionVola;
 
-        public LiborForwardModel(LiborForwardModelProcess process,
-                          LmVolatilityModel volaModel,
-                          LmCorrelationModel corrModel)
+        public LiborForwardModel(LiborForwardModelProcess process, LmVolatilityModel volaModel, LmCorrelationModel corrModel)
             : base(volaModel.parameters().Count + corrModel.parameters().Count) {
 
             f_ = new InitializedList<double>(process.size());
@@ -53,9 +51,6 @@ namespace QLNet
                 f_[i] = 1.0/(1.0+accrualPeriod_[i]*process_.initialValues()[i]);
             }
         }
-
-
-
         public override void setParams( Vector parameters) {
         base.setParams(parameters);
 
@@ -67,11 +62,8 @@ namespace QLNet
         swaptionVola = null;
     }
 
-
-        public double discountBondOption(Option.Type type,
-                                               double strike, double maturity,
-                                               double bondMaturity)  {
-
+        public double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity)
+        {
             List<double>  accrualStartTimes
                 = process_.accrualStartTimes();
             List<double>   accrualEndTimes
@@ -109,15 +101,12 @@ namespace QLNet
 
             return npv / (1.0 + capRate*tenor);
         }
-
-        public double discount(double t) {
+        public double Discount(double t) {
            return process_.index().forwardingTermStructure().link.discount(t);
         }
-
-        public double discountBond(double t,double maturity,Vector v) {
-            return discount(maturity);
+        public double DiscountBond(double t,double maturity,Vector v) {
+            return Discount(maturity);
         }
-
         public Vector w_0(int alpha, int beta)  
 {
             Vector omega = new Vector(beta + 1, 0.0);

@@ -35,27 +35,21 @@ namespace QLNet
                                                                 Swaption.Results>
     {
 
-        /*! \note the term structure is only needed when the short-rate
-                 model cannot provide one itself.
-        */
-        public JamshidianSwaptionEngine(OneFactorAffineModel model,
-                                Handle<YieldTermStructure> termStructure)
+        /// <param name="termStructure">If the previous model is ITermStructureConsistent, it should be its term structure</param>
+        public JamshidianSwaptionEngine(OneFactorAffineModel model, 
+           Handle<YieldTermStructure> termStructure)
             : base(model)
         {
             termStructure_ = termStructure;
             termStructure_.registerWith(update);
         }
 
-        public JamshidianSwaptionEngine(OneFactorAffineModel model)
-            : this(model, new Handle<YieldTermStructure>())
-        { }
-
         private Handle<YieldTermStructure> termStructure_;
 
-        public class rStarFinder : ISolver1d
+        public class RStarFinder : ISolver1d
         {
 
-            public rStarFinder(OneFactorAffineModel model,
+            public RStarFinder(OneFactorAffineModel model,
                         double nominal,
                         double maturity,
                         List<double> fixedPayTimes,
@@ -75,7 +69,7 @@ namespace QLNet
                 for (int i = 0; i < size; i++)
                 {
                     double dbValue =
-                        model_.discountBond(maturity_, times_[i], x);
+                        model_.DiscountBond(maturity_, times_[i], x);
                     value -= amounts_[i] * dbValue;
                 }
                 return value;
@@ -99,28 +93,8 @@ namespace QLNet
             Utils.QL_REQUIRE(arguments_.swap.spread.IsEqual(0.0) ,()=> 
                "non zero spread (" + arguments_.swap.spread + ") not allowed");
 
-            Date referenceDate;
-            DayCounter dayCounter;
-
-            ITermStructureConsistentModel tsmodel = (ITermStructureConsistentModel)base.model_.link;
-            try
-            {
-                if (tsmodel != null)
-                {
-                    referenceDate = tsmodel.termStructure().link.referenceDate();
-                    dayCounter = tsmodel.termStructure().link.dayCounter();
-                }
-                else
-                {
-                    referenceDate = termStructure_.link.referenceDate();
-                    dayCounter = termStructure_.link.dayCounter();
-                }
-            }
-            catch
-            {
-                referenceDate = termStructure_.link.referenceDate();
-                dayCounter = termStructure_.link.dayCounter();
-            }
+            Date referenceDate = referenceDate = termStructure_.link.referenceDate();
+            DayCounter dayCounter = termStructure_.link.dayCounter();
 
             List<double> amounts = new InitializedList<double>(arguments_.fixedCoupons.Count);
             for (int i = 0; i < amounts.Count; i++)
@@ -136,7 +110,7 @@ namespace QLNet
                     dayCounter.yearFraction(referenceDate,
                                             arguments_.fixedPayDates[i]);
 
-            rStarFinder finder = new rStarFinder(model_, arguments_.nominal, maturity,
+            RStarFinder finder = new RStarFinder(model_, arguments_.nominal, maturity,
                                                 fixedPayTimes, amounts);
             Brent s1d = new Brent();
             double minStrike = -10.0;
@@ -156,10 +130,10 @@ namespace QLNet
                 double fixedPayTime =
                     dayCounter.yearFraction(referenceDate,
                                             arguments_.fixedPayDates[i]);
-                double strike = model_.link.discountBond(maturity,
+                double strike = model_.link.DiscountBond(maturity,
                                                    fixedPayTime,
                                                    rStar);
-                double dboValue = model_.link.discountBondOption(
+                double dboValue = model_.link.DiscountBondOption(
                                                    w, strike, maturity,
                                                    fixedPayTime);
                 value += amounts[i] * dboValue;

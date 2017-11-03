@@ -29,6 +29,16 @@ namespace QLNet
        algebra. As such, it is <b>not</b> meant to be used as a
        container.
    */
+   public class NullCorrelationMatrix : Matrix
+   {
+      public NullCorrelationMatrix(int nFactors) :
+         base(nFactors,nFactors)
+      {
+         for (int i = 0; i < nFactors; i++)
+            for (int j = 0; j < nFactors; j++)
+               this[i, j] = i == j ? 1 : 0;
+      }
+   }
    public class Matrix
    {
       #region properties
@@ -107,6 +117,16 @@ namespace QLNet
          data_ = new double[rows * columns];
          rows_ = rows;
          columns_ = columns;
+      }
+
+      public Matrix(double[,] values)
+      {
+         rows_ = values.GetLength(0);
+         columns_ = values.GetLength(1);
+         data_ = new double[rows_ * columns_];
+         int index = 0;
+         foreach (double d in values)
+            data_[index++] = d;
       }
 
       //! creates the matrix and fills it with <tt>value</tt>

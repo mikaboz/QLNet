@@ -328,7 +328,7 @@ namespace TestSuite
 
                double zeroBond
                   = 1.0/jointProcess.numeraire(t, states);
-               double zeroOption = zeroBond * Math.Max(0.0, hwModel.discountBond(t, T, states[2]) - strike);
+               double zeroOption = zeroBond * Math.Max(0.0, hwModel.DiscountBond(t, T, states[2]) - strike);
 
                zeroStat[j].add(zeroBond);
                optionStat[j].add(zeroOption);
@@ -352,7 +352,7 @@ namespace TestSuite
             double T = grid[j + optionTenor];
 
             calculated = optionStat[j].mean();
-            expected = hwModel.discountBondOption(Option.Type.Call, strike, t, T);
+            expected = hwModel.DiscountBondOption(Option.Type.Call, strike, t, T);
 
             if (Math.Abs(calculated - expected) > 0.0035)
             {

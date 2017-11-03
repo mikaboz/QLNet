@@ -88,7 +88,7 @@ namespace QLNet
                     {
                         if (type == CapFloorType.Cap || type == CapFloorType.Collar)
                         {
-                            double discount = model_.link.discount(paymentTime);
+                            double discount = model_.link.Discount(paymentTime);
                             double strike = (double)arguments_.capRates[i];
                             value += discount * arguments_.nominals[i] * tenor
                                    * arguments_.gearings[i]
@@ -96,7 +96,7 @@ namespace QLNet
                         }
                         if (type == CapFloorType.Floor || type == CapFloorType.Collar)
                         {
-                            double discount = model_.link.discount(paymentTime);
+                            double discount = model_.link.Discount(paymentTime);
                             double strike = (double)arguments_.floorRates[i];
                             double mult = (type == CapFloorType.Floor) ? 1.0 : -1.0;
                             value += discount * arguments_.nominals[i] * tenor
@@ -114,7 +114,7 @@ namespace QLNet
                             double temp = 1.0 + (double)arguments_.capRates[i] * tenor;
                             value += arguments_.nominals[i] *
                                 arguments_.gearings[i] * temp *
-                                model_.link.discountBondOption(Option.Type.Put, 1.0 / temp,
+                                model_.link.DiscountBondOption(Option.Type.Put, 1.0 / temp,
                                                            maturity, paymentTime);
                         }
                         if (type == CapFloorType.Floor || type == CapFloorType.Collar)
@@ -123,7 +123,7 @@ namespace QLNet
                             double mult = (type == CapFloorType.Floor) ? 1.0 : -1.0;
                             value += arguments_.nominals[i] *
                                 arguments_.gearings[i] * temp * mult *
-                                model_.link.discountBondOption(Option.Type.Call, 1.0 / temp,
+                                model_.link.DiscountBondOption(Option.Type.Call, 1.0 / temp,
                                                            maturity, paymentTime);
                         }
                     }

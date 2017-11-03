@@ -30,31 +30,74 @@ namespace QLNet
    /// </summary>
    public class CoxIngersollRoss : OneFactorAffineModel
    {
-      private Parameter theta_;
-      private Parameter k_;
-      private Parameter sigma_;
-      private Parameter r0_;
-
-      public CoxIngersollRoss(double r0 = 0.05,
-         double theta = 0.1,
-         double k = 0.1,
-         double sigma = 0.1)
-         : base(4)
+      #region Feller constraint
+      public class FellerConstraint : Constraint
       {
-         theta_ = arguments_[0];
-         k_ = arguments_[1];
-         sigma_ = arguments_[2];
-         r0_ = arguments_[3];
-      }
+         private class Impl : IConstraint
+         {
+            public bool test(Vector param)
+            {
+               double theta = param[0];
+               double kappa = param[1];
+               double sigma = param[2];
 
-      public override double discountBondOption(Option.Type type,
-         double strike,
-         double maturity,
-         double bondMaturity)
+               return (sigma >= 0.0 && sigma * sigma < 2.0 * kappa * theta);
+            }
+
+            public Vector upperBound(Vector parameters)
+            {
+               return new Vector(parameters.size(), Double.MaxValue);
+            }
+
+            public Vector lowerBound(Vector parameters)
+            {
+               return new Vector(parameters.size(), Double.MinValue);
+            }
+         }
+         public FellerConstraint()
+            : base(new FellerConstraint.Impl())
+         { }
+      }
+      #endregion
+
+      #region Constructors
+      public CoxIngersollRoss(double r0, double kappa = 0.1, double theta = 0.1, double sigma = 0.1) :
+         base(3)
+      {
+         Utils.QL_REQUIRE(r0 >= 0, () => "r0 must be positive to initially satisfy feller constraint");
+         constraint_ = new CompositeConstraint(base.constraint_, new FellerConstraint());
+         r0_ = r0;
+         arguments_[0] = new ConstantParameter(kappa, new PositiveConstraint());
+         arguments_[1] = new ConstantParameter(theta, new PositiveConstraint());
+         arguments_[2] = new ConstantParameter(sigma, new PositiveConstraint());
+      }
+      public CoxIngersollRoss(Handle<YieldTermStructure> termStructure, double kappa = 0.1, double theta = 0.1, double sigma = 0.1) :
+         this(termStructure.link.forwardRate(0,0,Compounding.Continuous,Frequency.NoFrequency).rate(),kappa,theta,sigma)
+      {}
+      #endregion
+
+      #region Accessors
+      public double r0_;
+      public double Kappa
+      {
+         get { return arguments_[0].value(0.0); }
+      }
+      public double Theta
+      {
+         get { return arguments_[1].value(0.0); }
+      }
+      public double Sigma
+      {
+         get { return arguments_[2].value(0.0); }
+      }
+      #endregion
+
+      #region IAffineModel implémentation
+      public override double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity)
       {
          Utils.QL_REQUIRE(strike > 0.0, () => "strike must be positive");
-         double discountT = discountBond(0.0, maturity, x0());
-         double discountS = discountBond(0.0, bondMaturity, x0());
+         double discountT = this.DiscountBond(0.0, maturity, r0_);
+         double discountS = this.DiscountBond(0.0, bondMaturity, r0_);
 
          if (maturity < Const.QL_EPSILON)
          {
@@ -69,16 +112,16 @@ namespace QLNet
                   break;
             }
          }
-         double sigma2 = sigma() * sigma();
-         double h = Math.Sqrt(k() * k() + 2.0 * sigma2);
+         double sigma2 = Sigma * Sigma;
+         double h = Math.Sqrt(Kappa * Kappa + 2.0 * sigma2);
          double b = B(maturity, bondMaturity);
 
          double rho = 2.0 * h / (sigma2 * (Math.Exp(h * maturity) - 1.0));
-         double psi = (k() + h) / sigma2;
+         double psi = (Kappa + h) / sigma2;
 
-         double df = 4.0 * k() * theta() / sigma2;
-         double ncps = 2.0 * rho * rho * x0() * Math.Exp(h * maturity) / (rho + psi + b);
-         double ncpt = 2.0 * rho * rho * x0() * Math.Exp(h * maturity) / (rho + psi);
+         double df = 4.0 * Kappa * Theta / sigma2;
+         double ncps = 2.0 * rho * rho * r0_ * Math.Exp(h * maturity) / (rho + psi + b);
+         double ncpt = 2.0 * rho * rho * r0_ * Math.Exp(h * maturity) / (rho + psi);
 
          NonCentralChiSquareDistribution chis = new NonCentralChiSquareDistribution(df, ncps);
          NonCentralChiSquareDistribution chit = new NonCentralChiSquareDistribution(df, ncpt);
@@ -92,110 +135,42 @@ namespace QLNet
          else
             return call - discountS + strike * discountT;
       }
-
-      public override ShortRateDynamics dynamics()
+      public override double A(double t, double T)
       {
-         return new Dynamics(theta(), k(), sigma(), x0());
-      }
-
-      public override Lattice tree(TimeGrid grid)
-      {
-         TrinomialTree trinomial = new TrinomialTree(dynamics().process(), grid, true);
-         return new ShortRateTree(trinomial, dynamics(), grid);
-      }
-
-      protected override double A(double t, double T)
-      {
-         double sigma2 = sigma() * sigma();
-         double h = Math.Sqrt(k() * k() + 2.0 * sigma2);
-         double numerator = 2.0 * h * Math.Exp(0.5 * (k() + h) * (T - t));
-         double denominator = 2.0 * h + (k() + h) * (Math.Exp((T - t) * h) - 1.0);
+         double sigma2 = Sigma * Sigma;
+         double h = Math.Sqrt(Kappa * Kappa + 2.0 * sigma2);
+         double numerator = 2.0 * h * Math.Exp(0.5 * (Kappa + h) * (T - t));
+         double denominator = 2.0 * h + (Kappa + h) * (Math.Exp((T - t) * h) - 1.0);
          double value = Math.Log(numerator / denominator) *
-                        2.0 * k() * theta() / sigma2;
+                        2.0 * Kappa * Theta / sigma2;
          return Math.Exp(value);
       }
-
-      protected override double B(double t, double T)
+      public override double B(double t, double T)
       {
-         double h = Math.Sqrt(k() * k() + 2.0 * sigma() * sigma());
+         double h = Math.Sqrt(Kappa * Kappa + 2.0 * Sigma * Sigma);
          double temp = Math.Exp((T - t) * h) - 1.0;
          double numerator = 2.0 * temp;
-         double denominator = 2.0 * h + (k() + h) * temp;
+         double denominator = 2.0 * h + (Kappa + h) * temp;
          double value = numerator / denominator;
          return value;
       }
+      #endregion
 
-      protected double theta()
+      #region Dynamics
+      public override ShortRateModel.Dynamics dynamics()
       {
-         return theta_.value(0.0);
+         return new OneFactorModel.Dynamics(new SquareRootProcess(r0_, Kappa, Theta, Sigma));
       }
+      
+      #endregion
 
-      protected double k()
+      #region Tree
+      public override Lattice tree(TimeGrid grid)
       {
-         return k_.value(0.0);
+         OneFactorModel.Dynamics dyn = (OneFactorModel.Dynamics)dynamics();
+         TrinomialTree trinomial = new TrinomialTree(dyn.Process, grid, true);
+         return new ShortRateTree(trinomial, dyn, grid);
       }
-
-      protected double sigma()
-      {
-         return sigma_.value(0.0);
-      }
-
-      protected double x0()
-      {
-         return r0_.value(0.0);
-      }
-
-      public class HelperProcess : StochasticProcess1D
-      {
-         private double y0_, theta_, k_, sigma_;
-
-         public HelperProcess(double theta, double k, double sigma, double y0)
-         {
-            y0_ = y0;
-            theta_ = theta;
-            k_ = k;
-            sigma_ = sigma;
-         }
-
-         public override double x0()
-         {
-            return y0_;
-         }
-
-         public override double drift(double d, double y)
-         {
-            return (0.5 * theta_ * k_ - 0.125 * sigma_ * sigma_) / y
-                   - 0.5 * k_ * y;
-         }
-
-         public override double diffusion(double d1, double d2)
-         {
-            return 0.5 * sigma_;
-         }
-      }
-
-      //! %Dynamics of the short-rate under the Cox-Ingersoll-Ross model
-      /*! The state variable \f$ y_t \f$ will here be the square-root of the
-          short-rate.
-      */
-      public class Dynamics : ShortRateDynamics
-      {
-         public Dynamics(double theta,
-            double k,
-            double sigma,
-            double x0)
-            : base(new HelperProcess(theta, k, sigma, Math.Sqrt(x0)))
-         { }
-
-         public override double variable(double d, double r)
-         {
-            return Math.Sqrt(r);
-         }
-
-         public override double shortRate(double d, double y)
-         {
-            return y * y;
-         }
-      }
+      #endregion
    }
 }

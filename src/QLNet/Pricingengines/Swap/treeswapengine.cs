@@ -67,8 +67,8 @@ namespace QLNet
          {
             if (tsmodel != null)
             {
-               referenceDate = tsmodel.termStructure().link.referenceDate();
-               dayCounter = tsmodel.termStructure().link.dayCounter();
+               referenceDate = tsmodel.TermStructure.link.referenceDate();
+               dayCounter = tsmodel.TermStructure.link.dayCounter();
             }
             else
             {

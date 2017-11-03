@@ -42,7 +42,7 @@ namespace QLNet
          return new BSMOperator(grid, process, residualTime);
       }
 
-      public static TridiagonalOperator getOperator(OneFactorModel.ShortRateDynamics process, Vector grid)
+      public static TridiagonalOperator getOperator(OneFactorModel.Dynamics process, Vector grid)
       {
          throw new NotImplementedException();
       }

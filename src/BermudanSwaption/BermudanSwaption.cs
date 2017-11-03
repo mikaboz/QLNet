@@ -184,7 +184,7 @@ namespace BermudanSwaption
 
             Console.WriteLine("Hull-White (analytic formulae) calibration");
             for (int i = 0; i < swaptions.Count; i++)
-                swaptions[i].setPricingEngine(new JamshidianSwaptionEngine(modelHw));
+                swaptions[i].setPricingEngine(new JamshidianSwaptionEngine(modelHw, rhTermStructure));
             CalibrateModel(modelHw, swaptions);
             Console.WriteLine("calibrated to:\n" +
                               "a = {0:0.000000}, " +

@@ -38,7 +38,6 @@ namespace QLNet
       {
          constraint_ = new NoConstraint();
       }
-
       protected Parameter( int size, Impl impl, Constraint constraint )
       {
          impl_ = impl;
@@ -74,7 +73,6 @@ namespace QLNet
          : base( 1, new ConstantParameter.Impl(), constraint )
       {
       }
-
       public ConstantParameter( double value, Constraint constraint )
          : base( 1, new ConstantParameter.Impl(), constraint )
       {
@@ -82,25 +80,55 @@ namespace QLNet
 
          Utils.QL_REQUIRE(testParams( params_ ) ,()=> ": invalid value" );
       }
-
    }
 
-   //! %Parameter which is always zero \f$ a(t) = 0 \f$
-   public class NullParameter : Parameter
+   public class FixedParameter : Parameter
    {
       private new class Impl : Parameter.Impl
       {
-         public override double value( Vector UnnamedParameter1, double UnnamedParameter2 )
+         private double fixedValue_;
+         public Impl(double fixedValue)
          {
-            return 0.0;
+            fixedValue_ = fixedValue;
+         }
+         public override double value(Vector parameters, double UnnamedParameter1)
+         {
+            return fixedValue_;
          }
       }
-      public NullParameter()
-         : base( 0, new NullParameter.Impl(), new NoConstraint() )
-      {
-      }
+      public FixedParameter(double fixedValue)
+         : base(0, new FixedParameter.Impl(fixedValue), new NoConstraint())
+      {}
    }
 
+   //! %Parameter which is always zero \f$ a(t) = 0 \f$
+   public class NullParameter : FixedParameter
+   {
+      public NullParameter() :
+         base(0.0)
+      { }
+   }
+   public class TimeDeterministParameter : Parameter
+   {
+      public TimeDeterministParameter(Func<double[], double, double> function, double[] parameters, Constraint constraint) :
+         base(parameters.Length, new TimeDeterministParameter.Impl(function), constraint)
+      {
+         for (int i = 0; i < params_.Count; i++)
+            params_[i] = parameters[i];
+      }
+      public new class Impl : Parameter.Impl
+      {
+         Func<double[], double, double> function_;
+         public Impl(Func<double[], double, double> function)
+         {
+            function_ = function;
+         }
+         public override double value(Vector p, double t)
+         {
+            return function_(p.ToArray(), t);
+         }
+      }
+   }
    //! Piecewise-constant parameter
    //    ! \f$ a(t) = a_i if t_{i-1} \geq t < t_i \f$.
    //        This kind of parameter is usually used to enhance the fitting of a
@@ -132,7 +160,6 @@ namespace QLNet
       {
       }
    }
-
    //! Deterministic time-dependent parameter used for yield-curve fitting
    public class TermStructureFittingParameter : Parameter
    {
@@ -175,15 +202,20 @@ namespace QLNet
 
          public Handle<YieldTermStructure> termStructure() { return termStructure_; }
       }
-
-      public TermStructureFittingParameter( Parameter.Impl impl )
+      protected TermStructureFittingParameter(TermStructureFittingParameter.Impl impl )
          : base( 0, impl, new NoConstraint() )
-      {
-      }
-
-      public TermStructureFittingParameter( Handle<YieldTermStructure> term )
+      {}
+      public TermStructureFittingParameter(Handle<YieldTermStructure> term )
          : base( 0, new NumericalImpl( term ), new NoConstraint() )
+      {}
+      
+      public abstract new class Impl : Parameter.Impl
       {
+         protected ITermStructureConsistentModel model_;
+         public Impl(ITermStructureConsistentModel model)
+         {
+            model_ = model;
+         }
       }
    }
 

@@ -19,315 +19,196 @@
 using System;
 using System.Collections.Generic;
 
-// Two-factor additive Gaussian Model G2 + +
-
 namespace QLNet
 {
 
-    //! Two-additive-factor gaussian model class.
-    /*! This class implements a two-additive-factor model defined by
-        \f[
-            dr_t = \varphi(t) + x_t + y_t
-        \f]
-        where \f$ x_t \f$ and \f$ y_t \f$ are defined by
-        \f[
-            dx_t = -a x_t dt + \sigma dW^1_t, x_0 = 0
-        \f]
-        \f[
-            dy_t = -b y_t dt + \sigma dW^2_t, y_0 = 0
-        \f]
-        and \f$ dW^1_t dW^2_t = \rho dt \f$.
+   //! Two-additive-factor gaussian model class.
+   /*! This class implements a two-additive-factor model defined by
+       \f[
+           dr_t = \varphi(t) + x_t + y_t
+       \f]
+       where \f$ x_t \f$ and \f$ y_t \f$ are defined by
+       \f[
+           dx_t = -a x_t dt + \sigma dW^1_t, x_0 = 0
+       \f]
+       \f[
+           dy_t = -b y_t dt + \sigma dW^2_t, y_0 = 0
+       \f]
+       and \f$ dW^1_t dW^2_t = \rho dt \f$.
 
-        \bug This class was not tested enough to guarantee
-             its functionality.
+       \bug This class was not tested enough to guarantee
+            its functionality.
 
-        \ingroup shortrate
-    */
-    public class G2 : TwoFactorModel,
-                      IAffineModel,
-                      ITermStructureConsistentModel
-    {
-
-
-        #region ITermStructureConsistentModel
-        public Handle<YieldTermStructure> termStructure()
-        {
-            return termStructure_;
-        }
-
-        public Handle<YieldTermStructure> termStructure_ { get; set; }
-        #endregion
-
-        Parameter a_;
-        Parameter sigma_;
-        Parameter b_;
-        Parameter eta_;
-        Parameter rho_;
-        Parameter phi_;
-
-        public G2(Handle<YieldTermStructure> termStructure,
-           double a,
-           double sigma,
-           double b,
-           double eta,
-           double rho)
-            : base(5)
-        {
-            termStructure_ = termStructure;
-            a_ = arguments_[0] = new ConstantParameter(a, new PositiveConstraint());
-            sigma_ = arguments_[1] = new ConstantParameter(sigma, new PositiveConstraint());
-            b_ = arguments_[2] = new ConstantParameter(b, new PositiveConstraint());
-            eta_ =  arguments_[3] = new ConstantParameter(eta, new PositiveConstraint());
-            rho_ = arguments_[4] = new ConstantParameter(rho, new BoundaryConstraint(-1.0, 1.0));
-
-            generateArguments();
-            termStructure.registerWith(update);
-        }
-
-        public G2(Handle<YieldTermStructure> termStructure,
-           double a,
-           double sigma,
-           double b,
-           double eta)
-            : this(termStructure, a, sigma, b, eta, -0.75)
-        { }
-
-        public G2(Handle<YieldTermStructure> termStructure,
-           double a,
-           double sigma,
-           double b)
-            : this(termStructure, a, sigma, b, 0.01, -0.75)
-        { }
-
-
-        public G2(Handle<YieldTermStructure> termStructure,
-           double a,
-           double sigma)
-            : this(termStructure, a, sigma, 0.1, 0.01, -0.75)
-        { }
-
-        public G2(Handle<YieldTermStructure> termStructure,
-           double a)
-            : this(termStructure, a, 0.01, 0.1, 0.01, -0.75)
-        { }
-
-        public G2(Handle<YieldTermStructure> termStructure)
-            : this(termStructure, 0.1, 0.01, 0.1, 0.01, -0.75)
-        { }
-
-        public override ShortRateDynamics dynamics()
-        {
-            return new Dynamics(phi_, a(), sigma(), b(), eta(), rho());
-        }
-
-        public virtual double discountBond(double now,
-                                  double maturity,
-                                  Vector factors)
-        {
-            Utils.QL_REQUIRE(factors.size() > 1,()=> "g2 model needs two factors to compute discount bond");
-            return discountBond(now, maturity, factors[0], factors[1]);
-        }
-
-        public virtual double discountBond(double t, double T, double x, double y)
-        {
-            return A(t, T) * Math.Exp(-B(a(), (T - t)) * x - B(b(), (T - t)) * y);
-        }
-
-
-        public virtual double discountBondOption(Option.Type type,
-                                double strike,
-                                double maturity,
-                                double bondMaturity)
-        {
-            double v = sigmaP(maturity, bondMaturity);
-            double f = termStructure().link.discount(bondMaturity);
-            double k = termStructure().link.discount(maturity) * strike;
-
-            return Utils.blackFormula(type, k, f, v);
-        }
-
-        public double discount(double t)
-        {
-            return termStructure().currentLink().discount(t);
-        }
-
-        public double swaption(Swaption.Arguments arguments,
-                        double fixedRate,
-                        double range,
-                        int intervals){
-        
-        Date settlement = termStructure().link.referenceDate();
-        DayCounter dayCounter = termStructure().link.dayCounter();
-        double start = dayCounter.yearFraction(settlement,
-                                             arguments.floatingResetDates[0]);
-        double w = (arguments.type==VanillaSwap.Type.Payer ? 1 : -1 );
-
-        List<double> fixedPayTimes = new  InitializedList<double>(arguments.fixedPayDates.Count);
-        for (int i=0; i<fixedPayTimes.Count; ++i)
-            fixedPayTimes[i] =
-                dayCounter.yearFraction(settlement,
-                                        arguments.fixedPayDates[i]);
-
-        SwaptionPricingFunction function = new SwaptionPricingFunction(a(),
-                                                sigma(), b(), eta(), rho(),
-                                                w, start,
-                                                fixedPayTimes,
-                                                fixedRate,this);
-
-        double upper = function.mux() + range*function.sigmax();
-        double lower = function.mux() - range*function.sigmax();
-        SegmentIntegral integrator = new SegmentIntegral(intervals);
-        return arguments.nominal*w*termStructure().link.discount(start)*
-            integrator.value(function.value, lower, upper);
-        }
-
-        #region protected
-        protected override void generateArguments()
-        {
-            phi_ = new FittingParameter(termStructure(),
-                a(), sigma(), b(), eta(), rho());
-        }
-
-        protected double A(double t, double T)
-        {
-            return termStructure().link.discount(T) / termStructure().link.discount(t) *
-             Math.Exp(0.5 * (V(T - t) - V(T) + V(t)));
-        }
-
-        protected double B(double x, double t)
-        {
-            return (1.0 - Math.Exp(-x * t)) / x;
-        }
-#endregion
-
-        #region private
-        double sigmaP(double t, double s)
-        {
-            double temp = 1.0 - Math.Exp(-(a() + b()) * t);
-            double temp1 = 1.0 - Math.Exp(-a() * (s - t));
-            double temp2 = 1.0 - Math.Exp(-b() * (s - t));
-            double a3 = a() * a() * a();
-            double b3 = b() * b() * b();
-            double sigma2 = sigma() * sigma();
-            double eta2 = eta() * eta();
-            double value =
-                0.5 * sigma2 * temp1 * temp1 * (1.0 - Math.Exp(-2.0 * a() * t)) / a3 +
-                0.5 * eta2 * temp2 * temp2 * (1.0 - Math.Exp(-2.0 * b() * t)) / b3 +
-                2.0 * rho() * sigma() * eta() / (a() * b() * (a() + b())) *
-                temp1 * temp2 * temp;
-            return Math.Sqrt(value);
-        }
-
-
-        double V(double t)
-        {
-            double expat = Math.Exp(-a() * t);
-            double expbt = Math.Exp(-b() * t);
-            double cx = sigma() / a();
-            double cy = eta() / b();
-            double valuex = cx * cx * (t + (2.0 * expat - 0.5 * expat * expat - 1.5) / a());
-            double valuey = cy * cy * (t + (2.0 * expbt - 0.5 * expbt * expbt - 1.5) / b());
-            double value = 2.0 * rho() * cx * cy * (t + (expat - 1.0) / a()
-                                             + (expbt - 1.0) / b()
-                                             - (expat * expbt - 1.0) / (a() + b()));
-            return valuex + valuey + value;
-        }
-
-        double a() { return a_.value(0.0); }
-        double sigma() { return sigma_.value(0.0); }
-        double b() { return b_.value(0.0); }
-        double eta() { return eta_.value(0.0); }
-        double rho() { return rho_.value(0.0); }
-
-        #endregion
-
-        public class Dynamics : ShortRateDynamics
-        {
-
-            Parameter fitting_;
-            public Dynamics(Parameter fitting,
-                     double a,
-                     double sigma,
-                     double b,
-                     double eta,
-                     double rho)
-                : base((StochasticProcess1D)new OrnsteinUhlenbeckProcess(a, sigma),
-                       (StochasticProcess1D)(new OrnsteinUhlenbeckProcess(b, eta)), rho)
+       \ingroup shortrate
+   */
+   public class G2 : TwoFactorAffineModel, ITermStructureConsistentModel
+   {
+      #region Fitting
+      TermStructureFittingParameter phi_;
+      public class FittingParameter : TermStructureFittingParameter
+      {
+         private new class Impl : TermStructureFittingParameter.Impl
+         {
+            public Impl(G2 model) :
+               base(model)
+            { }
+            public override double value(Vector v, double t)
             {
-                fitting_ = fitting;
+               double forward = model_.TermStructureInitialForwardRate(t);
+
+               G2 g2 = model_ as G2;
+               return forward + g2.ValueForFitting(t);
             }
+         }
+         public FittingParameter(G2 model) :
+            base(new Impl(model))
+         { }
+      }
+      private double ValueForFitting(double t)
+      {
+         double temp1 = Sigma1 * (1.0 - Math.Exp(-Kappa1 * t)) / Kappa1;
+         double temp2 = Sigma2 * (1.0 - Math.Exp(-Kappa2 * t)) / Kappa2;
+         return 0.5 * temp1 * temp1 + 0.5 * temp2 * temp2 +
+             Rho * temp1 * temp2;
+      }
+      #endregion
 
-            public override double shortRate(double t, double x, double y)
-            {
-                return fitting_.value(t) + x + y;
-            }
+      #region ITermStructureConsistentModel implémentation
+      protected Handle<YieldTermStructure> termStructure_;
+      public Handle<YieldTermStructure> TermStructure { get { return termStructure_; } }
+      #endregion
 
-            public override StochasticProcess process()
-            {
-                throw new NotImplementedException();
-            }
+      #region Accessors
+      public new Gaussian First { get { return (Gaussian)base.First; } }
+      public new Gaussian Second { get { return (Gaussian)base.Second; } }
+      double Kappa1 { get { return First.Kappa; } }
+      double Sigma1 { get { return First.Sigma; } }
+      double Kappa2 { get { return Second.Kappa; } }
+      double Sigma2 { get { return Second.Sigma; } }
+      #endregion
 
-            //! Analytical term-structure fitting parameter \f$ \varphi(t) \f$.
-            /*! \f$ \varphi(t) \f$ is analytically defined by
-                \f[
-                    \varphi(t) = f(t) +
-                         \frac{1}{2}(\frac{\sigma(1-e^{-at})}{a})^2 +
-                         \frac{1}{2}(\frac{\eta(1-e^{-bt})}{b})^2 +
-                         \rho\frac{\sigma(1-e^{-at})}{a}\frac{\eta(1-e^{-bt})}{b},
-                \f]
-                where \f$ f(t) \f$ is the instantaneous forward rate at \f$ t \f$.
-            */
-        }
-        
-        public class FittingParameter : TermStructureFittingParameter
-            {
+      #region IAffineModel implémentation
+      private double V(double t)
+      {
+         double expat = Math.Exp(-Kappa1 * t);
+         double expbt = Math.Exp(-Kappa2 * t);
+         double cx = Sigma1 / Kappa1;
+         double cy = Sigma2 / Kappa2;
+         double valuex = cx * cx * (t + (2.0 * expat - 0.5 * expat * expat - 1.5) / Kappa1);
+         double valuey = cy * cy * (t + (2.0 * expbt - 0.5 * expbt * expbt - 1.5) / Kappa2);
+         double value = 2.0 * Rho * cx * cy * (t + (expat - 1.0) / Kappa1
+                                          + (expbt - 1.0) / Kappa2
+                                          - (expat * expbt - 1.0) / (Kappa1 + Kappa2));
+         return valuex + valuey + value;
+      }
+      public override double A(double t, double T)
+      {
+         return termStructure_.link.discount(T) / termStructure_.link.discount(t) *
+          Math.Exp(0.5 * (V(T - t) - V(T) + V(t)));
+      }
+      public override double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity)
+      {
+         double v = sigmaP(maturity, bondMaturity);
+         double f = termStructure_.link.discount(bondMaturity);
+         double k = termStructure_.link.discount(maturity) * strike;
+         return Utils.blackFormula(type, k, f, v);
+      }
+      // On préfère utiliser cette formulation pour le discount en 0, qui est moins couteuse que celle procurée par IAffineModel<TwoFactorModel>
+      public override double Discount(double t)
+      {
+         return termStructure_.link.discount(t);
+      }
+      #endregion
 
-                private new class Impl : Parameter.Impl
-                {
+      #region Constructors
+      public G2(Handle<YieldTermStructure> termStructure, Gaussian first, Gaussian second, double rho) :
+         base(first, second,rho)
+      {
+         termStructure_ = termStructure;
+         termStructure.registerWith(update);
+         generateArguments();
+      }
+      public G2(Handle<YieldTermStructure> termStructure, double a, double sigma, double b, double eta, double rho) :
+         this(termStructure, new HullWhite(termStructure, a, sigma), new HullWhite(termStructure, b, eta), rho)
+      { }
+      public G2(Handle<YieldTermStructure> termStructure, double a, double sigma, double b, double eta) :
+         this(termStructure, a, sigma, b, eta, -0.75)
+      { }
+      public G2(Handle<YieldTermStructure> termStructure, double a, double sigma, double b) :
+       this(termStructure, a, sigma, b, 0.01, -0.75)
+      { }
+      public G2(Handle<YieldTermStructure> termStructure, double a, double sigma) :
+       this(termStructure, a, sigma, 0.1, 0.01, -0.75)
+      { }
+      public G2(Handle<YieldTermStructure> termStructure, double a) : this(termStructure, a, 0.01, 0.1, 0.01, -0.75)
+      { }
+      public G2(Handle<YieldTermStructure> termStructure) :
+       this(termStructure, 0.1, 0.01, 0.1, 0.01, -0.75)
+      { }
+      protected override void generateArguments()
+      {
+         phi_ = new FittingParameter(this);
+      }
+      #endregion
 
+      #region Dynamics
+      public override ShortRateModel.Dynamics dynamics()
+      {
+         return new G2.Dynamics(this);
+      }
+      public new class Dynamics : TwoFactorModel.Dynamics
+      {
+         Parameter fitting_;
+         public Dynamics(G2 model) :
+            base(model)
+         {
+            fitting_ = model.phi_;
+         }
+         public override double ShortRate(double t, double x, double y)
+         {
+            return fitting_.value(t) + x + y;
+         }
+      }
+      #endregion
 
-                    public Impl(Handle<YieldTermStructure> termStructure,
-                         double a,
-                         double sigma,
-                         double b,
-                         double eta,
-                         double rho)
-                    {
-                        termStructure_ = termStructure;
-                        a_ = a;
-                        sigma_ = sigma;
-                        b_ = b;
-                        eta_ = eta;
-                        rho_ = rho;
-                    }
-
-                    public override double value(Vector v, double t)
-                    {
-                        InterestRate forward = termStructure_.currentLink().forwardRate(t, t,
-                                                                     Compounding.Continuous,
-                                                                     Frequency.NoFrequency);
-                        double temp1 = sigma_ * (1.0 - Math.Exp(-a_ * t)) / a_;
-                        double temp2 = eta_ * (1.0 - Math.Exp(-b_ * t)) / b_;
-                        double value = 0.5 * temp1 * temp1 + 0.5 * temp2 * temp2 +
-                            rho_ * temp1 * temp2 + forward.value();
-                        return value;
-                    }
-                    Handle<YieldTermStructure> termStructure_;
-                    double a_, sigma_, b_, eta_, rho_;
-                }
-
-                public FittingParameter(Handle<YieldTermStructure> termStructure,
-                                 double a,
-                                 double sigma,
-                                 double b,
-                                 double eta,
-                                 double rho)
-                    : base((Parameter.Impl)(
-                                      new FittingParameter.Impl(termStructure, a, sigma,
-                                                                 b, eta, rho))) { }
-            }
-
-        public class SwaptionPricingFunction {
+      #region Swaption valuation
+      double sigmaP(double t, double s)
+      {
+         double temp = 1.0 - Math.Exp(-(Kappa1 + Kappa2) * t);
+         double temp1 = 1.0 - Math.Exp(-Kappa1 * (s - t));
+         double temp2 = 1.0 - Math.Exp(-Kappa2 * (s - t));
+         double a3 = Kappa1 * Kappa1 * Kappa1;
+         double b3 = Kappa2 * Kappa2 * Kappa2;
+         double sigma2 = Sigma1 * Sigma1;
+         double eta2 = Sigma2 * Sigma2;
+         double value =
+             0.5 * sigma2 * temp1 * temp1 * (1.0 - Math.Exp(-2.0 * Kappa2 * t)) / a3 +
+             0.5 * eta2 * temp2 * temp2 * (1.0 - Math.Exp(-2.0 * Kappa2 * t)) / b3 +
+             2.0 * Rho * Sigma1 * Sigma2 / (Kappa1 * Kappa2 * (Kappa1 + Kappa2)) *
+             temp1 * temp2 * temp;
+         return Math.Sqrt(value);
+      }
+      public double swaption(Swaption.Arguments arguments, double fixedRate, double range, int intervals)
+      {
+         Date settlement = termStructure_.link.referenceDate();
+         DayCounter dayCounter = termStructure_.link.dayCounter();
+         double start = dayCounter.yearFraction(settlement, arguments.floatingResetDates[0]);
+         double w = (arguments.type == VanillaSwap.Type.Payer ? 1 : -1);
+         List<double> fixedPayTimes = new InitializedList<double>(arguments.fixedPayDates.Count);
+         for (int i = 0; i < fixedPayTimes.Count; ++i)
+            fixedPayTimes[i] = dayCounter.yearFraction(settlement, arguments.fixedPayDates[i]);
+         SwaptionPricingFunction function = new SwaptionPricingFunction(Kappa1,
+                                                 Sigma1, Kappa2, Sigma2, Rho,
+                                                 w, start,
+                                                 fixedPayTimes,
+                                                 fixedRate, this);
+         double upper = function.mux() + range * function.sigmax();
+         double lower = function.mux() - range * function.sigmax();
+         SegmentIntegral integrator = new SegmentIntegral(intervals);
+         return arguments.nominal * w * termStructure_.link.discount(start) *
+             integrator.value(function.value, lower, upper);
+      }
+      public class SwaptionPricingFunction {
       
         #region private fields 
         double a_, sigma_, b_, eta_, rho_, w_;
@@ -339,11 +220,8 @@ namespace QLNet
         double mux_, muy_, sigmax_, sigmay_, rhoxy_;
         #endregion
 
-        public SwaptionPricingFunction(double a, double sigma,
-                                double b, double eta, double rho,
-                                double w, double start,
-                                List<double> payTimes,
-                                double fixedRate, G2 model)
+        public SwaptionPricingFunction(double a, double sigma, double b, double eta, double rho, double w,
+                                       double start, List<double> payTimes, double fixedRate, G2 model)
         {
             a_ = a;
             sigma_ = sigma;
@@ -378,17 +256,15 @@ namespace QLNet
                      rho_*sigma_*eta_/(a_*(a_+b_))*
                      (1.0- Math.Exp(-(b_+a_)*T_)));
 
-            for (int i=0; i<size_; i++) {
-                A_[i] = model.A(T_, t_[i]);
-                Ba_[i] = model.B(a_, t_[i]-T_);
-                Bb_[i] = model.B(b_, t_[i]-T_);
+            for (int i = 0; i < size_; i++)
+            {
+               A_[i] = model.A(T_, t_[i]);
+               Ba_[i] = model.First.B(T_, t_[i]); // modif: original : model.B(a_, t_[i]-T_);
+               Bb_[i] = model.Second.B(T_, t_[i]); // modif: original : model.B(b_, t_[i]-T_);
             }
-        }
-
+         }
         internal double mux() { return mux_; }
-
         internal double sigmax() { return sigmax_; }
-        
         public double value(double x)  
         {
             CumulativeNormalDistribution phi = new CumulativeNormalDistribution();
@@ -425,7 +301,6 @@ namespace QLNet
             return Math.Exp(-0.5*temp*temp)*value/
                 (sigmax_*Math.Sqrt(2.0*QLNet.Const.M_PI));
         }
-
         public class SolvingFunction : ISolver1d
         {
             
@@ -447,10 +322,9 @@ namespace QLNet
             }
 
         }
-
     }
-
-    }
+      #endregion
+   }
 }
 
 

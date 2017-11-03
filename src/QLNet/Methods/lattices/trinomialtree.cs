@@ -28,14 +28,10 @@ namespace QLNet
         protected double x0_;
         protected List<double> dx_;
         protected TimeGrid timeGrid_;
-
-        public TrinomialTree(   StochasticProcess1D process,
-                                TimeGrid timeGrid)
-        : this( process,timeGrid,false){}
                               
         public TrinomialTree(   StochasticProcess1D process,
                                 TimeGrid timeGrid,
-                                bool isPositive /*= false*/)
+                                bool isPositive = false)
             : base(timeGrid.size())
         {
             branchings_ = new List<Branching>();

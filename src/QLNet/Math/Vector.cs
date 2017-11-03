@@ -21,6 +21,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace QLNet
 {
@@ -35,7 +36,10 @@ namespace QLNet
       /// <summary>
       /// Creates an empty Vector.
       /// </summary>
-      public Vector() : this(0)
+      public Vector() :
+         base()
+      {}
+      public Vector(double[] v) : this(v.ToList())
       {}
 
       /// <summary>

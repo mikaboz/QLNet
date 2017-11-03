@@ -26,127 +26,131 @@ namespace QLNet
    /// </summary>
    public class Vasicek : OneFactorAffineModel
    {
-      public Vasicek(double r0, double a, double b = 0.05, double sigma = 0.01, double lambda = 0.0)
-         : base(4)
+      protected double r0_;
+      public Vasicek(double r0, double kappa, double theta = 0.05, double sigma = 0.01)
+         : base(3)
       {
          r0_ = r0;
-         a_ = arguments_[0];
-         b_ = arguments_[1];
-         sigma_ = arguments_[2];
-         lambda_ = arguments_[3];
-         a_ = arguments_[0] = new ConstantParameter(a, new PositiveConstraint());
-         b_ = arguments_[1] = new ConstantParameter(b, new NoConstraint());
-         sigma_ = arguments_[2] = new ConstantParameter(sigma, new PositiveConstraint());
-         lambda_ = arguments_[3] = new ConstantParameter(lambda, new NoConstraint());
+         arguments_[0] = new ConstantParameter(kappa, new PositiveConstraint());
+         arguments_[1] = new ConstantParameter(theta, new NoConstraint());
+         arguments_[2] = new ConstantParameter(sigma, new PositiveConstraint());
+      }
+      public Vasicek(Handle<YieldTermStructure> termStructure, double kappa, double theta = 0.05, double sigma = 0.01)
+         : this(termStructure.link.forwardRate(0, 0, Compounding.Continuous, Frequency.NoFrequency).rate(), kappa, theta, sigma)
+      { }
+
+      public virtual double Kappa
+      {
+         get { return arguments_[0].value(0.0); }
+      }
+      public virtual double Theta
+      {
+         get { return arguments_[1].value(0.0); }
+      }
+      public virtual double Sigma
+      {
+         get { return arguments_[2].value(0.0); }
       }
 
-      public override double discountBondOption(Option.Type type, double strike, double maturity,
-         double bondMaturity)
+      protected double V(double t, double T)
       {
-         double v;
-         double _a = a();
-         if (Math.Abs(maturity) < Const.QL_EPSILON)
-         {
-            v = 0.0;
-         }
-         else if (_a < Math.Sqrt(Const.QL_EPSILON))
-         {
-            v = sigma() * B(maturity, bondMaturity) * Math.Sqrt(maturity);
-         }
-         else
-         {
-            v = sigma() * B(maturity, bondMaturity) *
-                Math.Sqrt(0.5 * (1.0 - Math.Exp(-2.0 * _a * maturity)) / _a);
-         }
-         double f = discountBond(0.0, bondMaturity, r0_);
-         double k = discountBond(0.0, maturity, r0_) * strike;
-
-         return Utils.blackFormula(type, k, f, v);
+         double exp = Math.Exp(-Kappa * (T - t));
+         double temp1 = (1 - exp) / Kappa;
+         double temp2 = (1-exp*exp)/ Kappa;
+         double c = Sigma / Kappa;
+         return c * c * (T - t - 2 * temp1 + 0.5 * temp2);
       }
 
-      public override ShortRateDynamics dynamics()
+      protected double E1(double t, double T)
       {
-         return new Dynamics(a(), b(), sigma(), r0_);
+         double exp = Math.Exp(-Kappa * (T - t));
+         return (1 - exp) / Kappa;
+      }
+      protected double E2(double t, double T)
+      {
+         return Theta * (T - t - E1(t, T));
       }
 
-      protected override double A(double t, double T)
+      public override double A(double t, double T)
       {
-         double _a = a();
+         return Math.Exp(0.5*V(t, T) - E2(t, T));
+         /*
+         double _a = Kappa;
          if (_a < Math.Sqrt(Const.QL_EPSILON))
          {
             return 0.0;
          }
          else
          {
-            double sigma2 = sigma() * sigma();
+            double sigma2 = Sigma * Sigma;
             double bt = B(t, T);
-            return Math.Exp((b() + lambda() * sigma() / _a
-                             - 0.5 * sigma2 / (_a * _a)) * (bt - (T - t))
+            return Math.Exp((Theta - 0.5 * sigma2 / (_a * _a)) * (bt - (T - t))
                             - 0.25 * sigma2 * bt * bt / _a);
          }
+         */
       }
-
-      protected override double B(double t, double T)
+      public override double B(double t, double T)
       {
-         double _a = a();
+         return E1(t, T);
+         /*
+         double _a = Kappa;
          if (_a < Math.Sqrt(Const.QL_EPSILON))
             return (T - t);
          else
             return (1.0 - Math.Exp(-_a * (T - t))) / _a;
+         */
       }
 
-      public double a()
+      public override double DiscountBondOption(Option.Type type, double strike, double maturity, double bondMaturity)
       {
-         return a_.value(0.0);
-      }
+         double v;
+         if (Math.Abs(maturity) < Const.QL_EPSILON)
+         {
+            v = 0.0;
+         }
+         else if (Kappa < Math.Sqrt(Const.QL_EPSILON))
+         {
+            v = Sigma * B(maturity, bondMaturity) * Math.Sqrt(maturity);
+         }
+         else
+         {
+            v = Sigma * B(maturity, bondMaturity) *
+                Math.Sqrt(0.5 * (1.0 - Math.Exp(-2.0 * Kappa * maturity)) / Kappa);
+         }
+         double f = this.DiscountBond(0.0, bondMaturity, r0_);
+         double k = this.DiscountBond(0.0, maturity, r0_) * strike;
 
-      public double b()
-      {
-         return b_.value(0.0);
+         return Utils.blackFormula(type, k, f, v);
       }
-
-      public double lambda()
-      {
-         return lambda_.value(0.0);
-      }
-
-      public double sigma()
-      {
-         return sigma_.value(0.0);
-      }
-
-      protected double r0_;
-      protected Parameter a_;
-      protected Parameter b_;
-      protected Parameter sigma_;
-      protected Parameter lambda_;
 
       //! Short-rate dynamics in the %Vasicek model
       /*! The short-rate follows an Ornstein-Uhlenbeck process with mean
           \f$ b \f$.
       */
-      public class Dynamics : ShortRateDynamics
+      public override ShortRateModel.Dynamics dynamics()
       {
-         public Dynamics(double a, double b, double sigma, double r0)
-            : base(new OrnsteinUhlenbeckProcess(a, sigma, r0 - b))
-         {
-            a_ = a;
-            b_ = b;
-            r0_ = r0;
-         }
-
-         public override double variable(double t, double r)
-         {
-            return r - b_;
-         }
-
-         public override double shortRate(double t, double x)
-         {
-            return x + b_;
-         }
-
-         private double a_, b_, r0_;
+         return new OneFactorModel.Dynamics(new OrnsteinUhlenbeckProcess(r0_, Kappa, Theta, Sigma));
       }
    }
+
+   public class Gaussian : Vasicek
+   {
+      public Gaussian(double kappa = 0.1, double sigma = 0.01)
+         : base(0, kappa, 0.0, sigma)
+      {
+         arguments_.Remove(arguments_[1]);
+         //Ainsi, argument[2] qui est sigma devient l'argument[1]. vérifié OK!
+      }
+      //public override double Kappa{get { return base.Kappa; }}
+      public override double Sigma
+      {
+         get { return arguments_[1].value(0.0); }
+      }
+      public override double Theta
+      {
+         get { return 0.0; }
+      }
+   }
+
 }
 
