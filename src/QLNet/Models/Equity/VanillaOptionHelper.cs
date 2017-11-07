@@ -103,7 +103,9 @@ namespace QLNet
       private double tau_;
       private Option.Type type_;
       private VanillaOption option_;
-      
+
+
+      public static void test() { }
       public class Export
       {
          int k = 0;
