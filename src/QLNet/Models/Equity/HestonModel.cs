@@ -27,36 +27,37 @@ namespace QLNet
 
        \test calibration is tested against known good values.
    */
+
+
+   // TODO: fonction pénalisation pour les vecteurs de paramètres qui ne vérifie pas la contrainte de feller
    public class HestonModel : CalibratedModel
    {
       public HestonModel(HestonProcess process)
          :base(5)
       {
          process_ = process;
-
-         arguments_[0] = new ConstantParameter( process.theta(), new PositiveConstraint() );
+         arguments_[0] = new ConstantParameter( process.v0(), new PositiveConstraint() );
          arguments_[1] = new ConstantParameter( process.kappa(), new PositiveConstraint() );
-         arguments_[2] = new ConstantParameter( process.sigma(), new PositiveConstraint() );
-         arguments_[3] = new ConstantParameter( process.rho(), new BoundaryConstraint( -1.0, 1.0 ) );
-         arguments_[4] = new ConstantParameter( process.v0(), new PositiveConstraint() );
+         arguments_[2] = new ConstantParameter( process.theta(), new PositiveConstraint());
+         arguments_[3] = new ConstantParameter( process.sigma(), new PositiveConstraint() );
+         arguments_[4] = new ConstantParameter( process.rho(), new BoundaryConstraint( -1.0, 1.0 ) );
          generateArguments();
 
          process_.riskFreeRate().registerWith(update) ;
          process_.dividendYield().registerWith( update) ;
          process_.s0().registerWith( update ) ;
-
       }
 
-      // variance mean version level
-      public double theta() { return arguments_[0].value(0.0); }
+      // spot variance
+      public double v0() { return arguments_[0].value(0.0); }
       // variance mean reversion speed
       public double kappa() { return arguments_[1].value(0.0); }
+      // variance mean version level
+      public double theta() { return arguments_[2].value(0.0); }
       // volatility of the volatility
-      public double sigma() { return arguments_[2].value(0.0); }
+      public double sigma() { return arguments_[3].value(0.0); }
       // correlation
-      public double rho() { return arguments_[3].value(0.0); }
-      // spot variance
-      public double v0() { return arguments_[4].value(0.0); }
+      public double rho() { return arguments_[4].value(0.0); }
 
       // underlying process
       public HestonProcess process() { return process_; }
@@ -67,9 +68,9 @@ namespace QLNet
          {
             public bool test(Vector param) 
             {
-               double theta = param[0];
                double kappa = param[1];
-               double sigma = param[2];
+               double theta = param[2];
+               double sigma = param[3];
 
                return (sigma >= 0.0 && sigma*sigma < 2.0*kappa*theta);
             }
@@ -89,6 +90,31 @@ namespace QLNet
             : base(new FellerConstraint.Impl()) 
          {}
     
+      }
+
+      public class Penalization : PenalizationFunction
+      {
+         public Penalization(HestonModel model, double shift, double weight) :
+            base(new Penalization.Impl(model, shift), new HestonModel.FellerConstraint(), weight)
+         { }
+
+         public new class Impl : PenalizationFunction.Impl
+         {
+            HestonModel model_;
+            double shift_;
+            public Impl(HestonModel model, double shift)
+            {
+               model_ = model;
+               shift_ = shift;
+            }
+            public override double Value(Vector v)
+            {
+               double kappa = model_.kappa();
+               double theta = model_.theta();
+               double sigma = model_.sigma();
+               return shift_ * Math.Abs(sigma * sigma - 2 * kappa * theta);
+            }
+         }
       }
 
       protected override void generateArguments()

@@ -42,7 +42,7 @@ namespace QLNet
 
          //! Compute state variable from short rate
          //public abstract double variable(double t, double rate);
-         public override double shortRate(double t, Vector variables)
+         public override double ShortRate(double t, Vector variables)
          {
             return shortRate(t, variables[0]);
          }
@@ -51,7 +51,7 @@ namespace QLNet
          {
             return variable;
          }
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             return r;
          }

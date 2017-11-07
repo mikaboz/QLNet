@@ -6,6 +6,42 @@ namespace QLNet
 {
    public class CIR2 : TwoFactorAffineModel
    {
+
+      public class FellerConstraint : Constraint
+      {
+         private class Impl : IConstraint
+         {
+            public bool test(Vector param)
+            {
+               double kappa1 = param[0];
+               double theta1 = param[1];
+               double sigma1 = param[2];
+
+               double kappa2 = param[3];
+               double theta2 = param[4];
+               double sigma2 = param[5];
+
+
+               return (sigma1 >= 0.0 && sigma1 * sigma1 < 2.0 * kappa1 * theta1) || (sigma2 >= 0.0 && sigma2 * sigma2 < 2.0 * kappa2 * theta2);
+            }
+
+            public Vector upperBound(Vector parameters)
+            {
+               return new Vector(parameters.size(), Double.MaxValue);
+            }
+
+            public Vector lowerBound(Vector parameters)
+            {
+               return new Vector(parameters.size(), Double.MinValue);
+            }
+         }
+
+         public FellerConstraint()
+            : base(new FellerConstraint.Impl())
+         { }
+
+      }
+
       #region Accessors
       public double X0 { get { return First.r0_; } }
       public double Y0 { get { return Second.r0_; } }

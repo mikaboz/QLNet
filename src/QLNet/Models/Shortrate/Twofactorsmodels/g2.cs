@@ -64,6 +64,7 @@ namespace QLNet
             base(new Impl(model))
          { }
       }
+      public TermStructureFittingParameter Fitting { get { return phi_; } }
       private double ValueForFitting(double t)
       {
          double temp1 = Sigma1 * (1.0 - Math.Exp(-Kappa1 * t)) / Kappa1;
@@ -166,7 +167,7 @@ namespace QLNet
          }
          public override double ShortRate(double t, double x, double y)
          {
-            return fitting_.value(t) + x + y;
+            return fitting_.value(t) + base.ShortRate(t, x, y);
          }
       }
       #endregion
@@ -188,6 +189,7 @@ namespace QLNet
              temp1 * temp2 * temp;
          return Math.Sqrt(value);
       }
+
       public double swaption(Swaption.Arguments arguments, double fixedRate, double range, int intervals)
       {
          Date settlement = termStructure_.link.referenceDate();
@@ -325,6 +327,7 @@ namespace QLNet
     }
       #endregion
    }
+
 }
 
 

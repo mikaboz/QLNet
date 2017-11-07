@@ -25,6 +25,7 @@ namespace QLNet
          }
       }
       private FittingParameter phi_;
+      public TermStructureFittingParameter Fitting { get { return phi_; } }
       #endregion
 
       #region ItermStructureConsistentModel implementation
@@ -62,9 +63,9 @@ namespace QLNet
          {
             fitting_ = model.phi_;
          }
-         public override double shortRate(double t, Vector v)
+         public override double ShortRate(double t, Vector v)
          {
-            return base.shortRate(t, v) + fitting_.value(t);
+            return base.ShortRate(t, v) + fitting_.value(t);
          }
       }
       #endregion
@@ -98,6 +99,34 @@ namespace QLNet
          throw new NotSupportedException("unsupported option type");  
       }
       #endregion
+
+      public class Penalization: PenalizationFunction
+      {
+         public Penalization(CIR2PlusPlus model, double shift, double weight) :
+            base(new Penalization.Impl(model, shift), new CIR2.FellerConstraint(), weight)
+         { }
+
+         public new class Impl : PenalizationFunction.Impl
+         {
+            CIR2PlusPlus model_;
+            double shift_;
+            public Impl(CIR2PlusPlus model, double shift)
+            {
+               model_ = model;
+               shift_ = shift;
+            }
+            public override double Value(Vector v)
+            {
+               double kappa1 = model_.Kappa1;
+               double theta1 = model_.Theta1;
+               double sigma1 = model_.Sigma1;
+               double kappa2 = model_.Kappa2;
+               double theta2 = model_.Theta2;
+               double sigma2 = model_.Sigma2;
+               return shift_ * (Math.Abs(sigma1 * sigma1 - 2 * kappa1 * theta1) + Math.Abs(sigma2 * sigma2 - 2 * kappa2 * theta2));
+            }
+         }
+      }
 
    }
 }

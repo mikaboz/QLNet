@@ -30,11 +30,8 @@ namespace QLNet
                  start date of the passed swap.
     */
 
-    public class JamshidianSwaptionEngine : GenericModelEngine<OneFactorAffineModel,
-                                                                Swaption.Arguments,
-                                                                Swaption.Results>
+    public class JamshidianSwaptionEngine : GenericModelEngine<OneFactorAffineModel, Swaption.Arguments, Swaption.Results>
     {
-
         /// <param name="termStructure">If the previous model is ITermStructureConsistent, it should be its term structure</param>
         public JamshidianSwaptionEngine(OneFactorAffineModel model, 
            Handle<YieldTermStructure> termStructure)
@@ -48,7 +45,6 @@ namespace QLNet
 
         public class RStarFinder : ISolver1d
         {
-
             public RStarFinder(OneFactorAffineModel model,
                         double nominal,
                         double maturity,
@@ -75,7 +71,7 @@ namespace QLNet
                 return value;
             }
 
-            private double strike_;
+         private double strike_;
             private double maturity_;
             private List<double> times_;
             private List<double> amounts_;
@@ -141,4 +137,5 @@ namespace QLNet
             results_.value = value;
         }
     }
+
 }

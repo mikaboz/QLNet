@@ -36,9 +36,40 @@ namespace QLNet
       #region ITermStructureConsistentModel
       private Handle<YieldTermStructure> termStructure_;
       public Handle<YieldTermStructure> TermStructure { get { return termStructure_; } }
+
+      public TermStructureFittingParameter Fitting { get { return phi_; } }
+      private TermStructureFittingParameter phi_;
+      //! Analytical term-structure fitting parameter \f$ \varphi(t) \f$.
+      /*! \f$ \varphi(t) \f$ is analytically defined by
+          \f[
+              \varphi(t) = f(t) + \frac{1}{2}[\frac{\sigma(1-e^{-at})}{a}]^2,
+          \f]
+          where \f$ f(t) \f$ is the instantaneous forward rate at \f$ t \f$.
+      */
+      public class FittingParameter : TermStructureFittingParameter
+      {
+         private new class Impl : TermStructureFittingParameter.Impl
+         {
+            public Impl(HullWhite model) :
+               base(model)
+            { }
+            // Cas spécial pour HullWhite, expression de alpha différente que pour les models affines.
+            public override double value(Vector v, double t)
+            {
+               return model_.TermStructureInitialForwardRate(t) + ((HullWhite)model_).ValueForFitting(t);
+            }
+         }
+         public FittingParameter(HullWhite model)
+            : base(new FittingParameter.Impl(model))
+         { }
+      }
+      private double ValueForFitting(double t)
+      {
+         double temp = Kappa < Math.Sqrt(Const.QL_EPSILON) ? Sigma * t : Sigma * (1.0 - Math.Exp(-Kappa * t)) / Kappa;
+         return 0.5 * temp * temp;
+      }
       #endregion
 
-      private TermStructureFittingParameter phi_;
       /// <summary>
       /// r(t) = x(t) + phi(t)
       /// where dx(t) = -kappa*x(t)*dt + sigma*dW(t)
@@ -174,7 +205,7 @@ namespace QLNet
          {
             fitting_ = fitting;
          }
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             return r - fitting_.value(t);
          }
@@ -183,36 +214,6 @@ namespace QLNet
             return x + fitting_.value(t);
          }
       
-      }
-
-      //! Analytical term-structure fitting parameter \f$ \varphi(t) \f$.
-      /*! \f$ \varphi(t) \f$ is analytically defined by
-          \f[
-              \varphi(t) = f(t) + \frac{1}{2}[\frac{\sigma(1-e^{-at})}{a}]^2,
-          \f]
-          where \f$ f(t) \f$ is the instantaneous forward rate at \f$ t \f$.
-      */
-      private double ValueForFitting(double t)
-      {
-         double temp = Kappa < Math.Sqrt(Const.QL_EPSILON) ? Sigma * t : Sigma * (1.0 - Math.Exp(-Kappa * t)) / Kappa;
-         return 0.5 * temp * temp;
-      }
-      public class FittingParameter : TermStructureFittingParameter
-      {
-         private new class Impl : TermStructureFittingParameter.Impl
-         {
-            public Impl(HullWhite model) :
-               base(model)
-            {}
-            // Cas spécial pour HullWhite, expression de alpha différente que pour les models affines.
-            public override double value(Vector v, double t)
-            {
-               return model_.TermStructureInitialForwardRate(t) + ((HullWhite)model_).ValueForFitting(t);
-            }
-         }
-         public FittingParameter(HullWhite model)
-            : base(new FittingParameter.Impl(model))
-         { }
       }
    }
 }

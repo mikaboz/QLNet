@@ -85,8 +85,8 @@ namespace QLNet
 
       protected class Link : IObservable, IObserver
       {
-         private T h_;
-         private bool isObserver_;
+         protected T h_;
+         protected bool isObserver_;
 
          public Link(T h, bool registerAsObserver)
          {
@@ -122,6 +122,7 @@ namespace QLNet
          public void update() { notifyObservers(); }
 
          // Observable
+
          private readonly WeakEventSource eventSource = new WeakEventSource();
 
          public event Callback notifyObserversEvent
@@ -140,6 +141,22 @@ namespace QLNet
          }
       }
    }
+
+   public class HandleExport<T> : Handle<T>
+      where T: IObservable
+   {
+      protected new class Link : Handle<T>.Link
+      {
+         public Link(T h) :
+            this(h,true)
+         { }
+         public Link(T h, bool registerAsObserver) :
+            base(h,registerAsObserver)
+         { }
+      }
+   }
+
+
 
    //! Relinkable handle to an observable
    /*! An instance of this class can be relinked so that it points to another observable. The change will be propagated to all

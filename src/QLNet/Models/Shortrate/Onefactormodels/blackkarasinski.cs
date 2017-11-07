@@ -23,6 +23,15 @@ namespace QLNet
 
    public class BlackKarasinski : OneFactorModel, ITermStructureConsistentModel
    {
+      #region ITermStructureConsistentModel
+      private Handle<YieldTermStructure> termStructure_;
+      public Handle<YieldTermStructure> TermStructure { get { return termStructure_; } }
+
+      // TODO
+      private TermStructureFittingParameter phi_;
+      public TermStructureFittingParameter Fitting { get { return phi_; } }
+      #endregion
+
       public double Kappa { get { return arguments_[0].value(0.0); } }
       public double Sigma { get { return arguments_[1].value(0.0); } }
 
@@ -75,12 +84,6 @@ namespace QLNet
          throw new NotImplementedException("no defined process for Black-Karasinski");
       }
 
-      #region ITermStructureConsistentModel
-      private Handle<YieldTermStructure> termStructure_;
-      public Handle<YieldTermStructure> TermStructure { get { return termStructure_; } }
-
-      #endregion
-
       //! Short-rate dynamics in the Black-Karasinski model
       public new class Dynamics : OneFactorModel.Dynamics
       {
@@ -90,7 +93,7 @@ namespace QLNet
             fitting_ = fitting;
          }
 
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             return Math.Log(r) - fitting_.value(t);
          }

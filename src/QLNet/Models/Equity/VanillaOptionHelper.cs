@@ -18,7 +18,7 @@ using System.Collections.Generic;
 
 namespace QLNet
 {
-   //! calibration helper for Heston model
+   //! calibration helper for Equity models
    public class VanillaOptionHelper : CalibrationHelper
    {
       public VanillaOptionHelper( Period maturity,
@@ -103,6 +103,46 @@ namespace QLNet
       private double tau_;
       private Option.Type type_;
       private VanillaOption option_;
+      
+      public class Export
+      {
+         int k = 0;
+         bool headerPop_ = false;
+         System.IO.FileStream file_;
+         System.IO.StreamWriter writer_;
+         VanillaOptionHelper option_;
+         public Export(string path, VanillaOptionHelper option) :
+            this(path)
+         {
+            option_ = option;
+         }
+         public Export(string path)
+         {
+            file_ = new System.IO.FileStream(path, System.IO.FileMode.Create);
+            writer_ = new System.IO.StreamWriter(file_);
+         }
+         public string Header()
+         {
+            headerPop_ = true;
+            return "strike\tmaturity\tvolatility";
+         }
+         public void DoExport()
+         {
+            if (!headerPop_) writer_.WriteLine(Header());
+            writer_.WriteLine(this.ToString());
+            writer_.Flush();
+         }
+         public void Iterate()
+         {
+            file_.Seek(0, System.IO.SeekOrigin.Begin);
+            k++;
+         }
+         public void setItem(VanillaOptionHelper option) { option_ = option; }
+         public override string ToString()
+         {
+            return option_.strikePrice_ + "\t" + option_.maturity_.length() + "\t" + option_.volatility_.link.value();
+         }
+      }
     }
 
    

@@ -86,14 +86,14 @@ namespace QLNet
             }
             Cor = model.Cor();
          }
-         public override double shortRate(double t, Vector variables)
+         public override double ShortRate(double t, Vector variables)
          {
             return variables.Sum();
          }
          /// <summary>
          /// Not Implemented for multiFactors
          /// </summary>
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             throw new NotImplementedException();
          }

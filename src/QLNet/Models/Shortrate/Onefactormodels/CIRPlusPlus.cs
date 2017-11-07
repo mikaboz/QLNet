@@ -23,6 +23,29 @@ namespace QLNet
 {
    public class CIRPlusPlus : CoxIngersollRoss, ITermStructureConsistentModel
    {
+
+      #region ITermStructureConsistentModel
+      private Handle<YieldTermStructure> termStructure_;
+      public Handle<YieldTermStructure> TermStructure { get { return termStructure_; } }
+
+      public class FittingParameter : TermStructureFittingParameter
+      {
+         public FittingParameter(CIRPlusPlus model) :
+            base(new Impl(model))
+         { }
+         private new class Impl : TermStructureFittingParameter.Impl
+         {
+            public Impl(CIRPlusPlus model) :
+               base(model)
+            { }
+            public override double value(Vector p, double t)
+            {
+               return model_.TermStructureInitialForwardRate(t) - ((CIRPlusPlus)model_).ValueForFitting(t);
+            }
+         }
+      }
+      private FittingParameter phi_;
+      public TermStructureFittingParameter Fitting { get { return phi_; } }
       public double ValueForFitting(double t)
       {
          double h = Math.Sqrt(Kappa * Kappa + 2 * Sigma * Sigma);
@@ -35,23 +58,7 @@ namespace QLNet
          double denominator2 = denominator2_ * denominator2_;
          return numerator1 / denominator1 + r0_ * numerator2 / denominator2;
       }
-      public class FittingParameter : TermStructureFittingParameter
-      {
-         public FittingParameter(CIRPlusPlus model) :
-            base(new Impl(model))
-         { }
-         private new class Impl : TermStructureFittingParameter.Impl
-         {
-            public Impl(CIRPlusPlus model) :
-               base(model)
-            {}
-            public override double value(Vector p, double t)
-            {
-               return model_.TermStructureInitialForwardRate(t) - ((CIRPlusPlus)model_).ValueForFitting(t);
-            }
-         }
-      }
-      private FittingParameter phi_;
+      #endregion
 
       public CIRPlusPlus(Handle<YieldTermStructure> termStructure, double r0, double kappa = 0.1, double theta = 0.1, double sigma = 0.1) :
          base(r0,kappa,theta,sigma)
@@ -65,11 +72,6 @@ namespace QLNet
       {
          phi_ = new FittingParameter(this);
       }
-      #region ITermStructureConsistentModel
-      private Handle<YieldTermStructure> termStructure_;
-      public Handle<YieldTermStructure> TermStructure { get { return termStructure_; }}
-      #endregion
-      
       public override double A(double t, double T)
       {
          double P0T = termStructure_.link.discount(T);
@@ -108,6 +110,7 @@ namespace QLNet
       }
       public override ShortRateModel.Dynamics dynamics()
       {
+         //return new FittedDynamics<CoxIngersollRoss>(this as CoxIngersollRoss, phi_);
          return new CIRPlusPlus.Dynamics(phi_,new SquareRootProcess(r0_,Kappa,Theta,Sigma));
       }
       public new class Dynamics : OneFactorModel.Dynamics
@@ -118,7 +121,7 @@ namespace QLNet
          {
             fitting_ = fitting;
          }
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             return r - fitting_.value(t);
          }

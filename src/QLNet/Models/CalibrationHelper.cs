@@ -25,7 +25,9 @@ namespace QLNet
 	//! liquid market instrument used during calibration
 	public abstract class CalibrationHelper : LazyObject
 	{
-		public enum CalibrationErrorType
+
+
+      public enum CalibrationErrorType
 		{
 			RelativePriceError, PriceError, ImpliedVolError
 		}

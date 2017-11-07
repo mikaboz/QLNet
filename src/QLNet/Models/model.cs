@@ -95,28 +95,11 @@ namespace QLNet {
     }
 
    //ITermStructureConsistentModel used ins shortratemodel blackkarasinski.cs/hullwhite.cs
-   public class FittingDynamics<T> : ShortRateModel.Dynamics
-      where T : ShortRateModel.Dynamics
-   {
-      TermStructureFittingParameter phi_;
-      T underlyingDynamics_;
-      public FittingDynamics(T underlyingDynamics, TermStructureFittingParameter phi)
-      {
-         underlyingDynamics_ = underlyingDynamics;
-         phi_ = phi;
-      }
-      public override double shortRate(double t, Vector variables)
-      {
-         return underlyingDynamics_.shortRate(t, variables) + phi_.value(t);
-      }
-      public override double variable(double t, double r)
-      {
-         throw new NotImplementedException();
-      }
-   }
+   
    public interface ITermStructureConsistentModel: IObservable, IObserver
    {
       Handle<YieldTermStructure> TermStructure { get; }
+      TermStructureFittingParameter Fitting { get; }
    }
    public static class TermStructureConsistentModelExtensions
    {
@@ -152,7 +135,8 @@ namespace QLNet {
                               EndCriteria endCriteria,
                               Constraint additionalConstraint = null, 
                               List<double> weights = null,
-                              List<bool> fixParameters = null) 
+                              List<bool> fixParameters = null,
+                              PenalizationFunction penalization = null) 
         {
            if ( weights == null ) weights = new List<double>();
            if ( additionalConstraint == null ) additionalConstraint = new Constraint();
@@ -171,7 +155,7 @@ namespace QLNet {
             Vector prms = parameters();
             List<bool> all = new InitializedList<bool>(prms.size(), false);
             Projection proj = new Projection(prms,fixParameters ?? all);
-            CalibrationFunction f = new CalibrationFunction(this,instruments,w,proj);
+            CalibrationFunction f = new CalibrationFunction(this,instruments,w,proj,penalization);
             ProjectedConstraint pc = new ProjectedConstraint(c,proj);
             Problem prob = new Problem(f, pc, proj.project(prms));
             shortRateEndCriteria_ = method.minimize(prob, endCriteria);
@@ -289,19 +273,60 @@ namespace QLNet {
             }
         }
 
-        //! Calibration cost function class
-        private class CalibrationFunction : CostFunction
+
+      public class PenalizationFunction
+      {
+         private double weight_;
+         private Impl impl_;
+         private Constraint constraint_;
+         protected PenalizationFunction(Impl impl, Constraint constraint, double weight = 1)
+         {
+            weight_ = weight;
+            impl_ = impl;
+            constraint_ = constraint;
+         }
+         public double Value(Vector v)
+         {
+            if (!constraint_.test(v))
+               return impl_.Value(v) * weight_;
+            else return 0;
+         }
+
+         public abstract class Impl
+         {
+            public abstract double Value(Vector v);
+         }
+      }
+      public class NullPenalization : PenalizationFunction
+      {
+         public NullPenalization() :
+            base(new NullPenalization.Impl(), new NoConstraint())
+         { }
+
+         public new class Impl : PenalizationFunction.Impl
+         {
+            public override double Value(Vector v)
+            {
+               return 0;
+            }
+         }
+      }
+
+      //! Calibration cost function class
+      private class CalibrationFunction : CostFunction
         {
            public CalibrationFunction( CalibratedModel model, 
                                        List<CalibrationHelper> instruments, 
                                        List<double> weights,
-                                       Projection projection)
+                                       Projection projection,
+                                       PenalizationFunction penalization= null)
            {
               // recheck
               model_ = model;
               instruments_ = instruments;
               weights_ = weights;
               projection_ = projection;
+            penalization_ = penalization ?? new NullPenalization();
            }
 
            public override double value( Vector p )
@@ -315,7 +340,7 @@ namespace QLNet {
                  value += diff * diff * weights_[i];
               }
 
-              return Math.Sqrt( value );
+              return Math.Sqrt( value ) + penalization_.Value(p);
            }
 
            public override Vector values( Vector p )
@@ -336,6 +361,7 @@ namespace QLNet {
            private List<CalibrationHelper> instruments_;
            private List<double> weights_;
            private Projection projection_;
+         private PenalizationFunction penalization_;
 
         }
 
@@ -363,7 +389,7 @@ namespace QLNet {
         #endregion
     }
 
-    public abstract class ShortRateModel : CalibratedModel
+   public abstract class ShortRateModel : CalibratedModel
    {
       /// <summary>
       /// Constructor adapted for OneFactorModel
@@ -385,10 +411,30 @@ namespace QLNet {
       public abstract class Dynamics
       {
          //! Compute state variable from short rate
-         public abstract double variable(double t, double r);
+         public abstract double Variable(double t, double r);
 
          //! Compute short rate from state variable
-         public abstract double shortRate(double t, Vector variables);
+         public abstract double ShortRate(double t, Vector variables);
       }
    }
+
+   /* public class FittingDynamics<T> : ShortRateModel.Dynamics
+      where T : ShortRateModel
+   {
+      TermStructureFittingParameter fitting_;
+      ShortRateModel.Dynamics dynamics_;
+      public FittingDynamics(T model, TermStructureFittingParameter fitting)
+      {
+         dynamics_ = model.dynamics();
+         fitting_ = fitting;
+      }
+      public override double ShortRate(double t, Vector variables)
+      {
+         return dynamics_.ShortRate(t, variables) + fitting_.value(t);
+      }
+      public override double Variable(double t, double r)
+      {
+         return Variable(t, r) - fitting_.value(t);
+      }
+   }*/
 }

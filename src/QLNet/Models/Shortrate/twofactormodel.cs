@@ -149,7 +149,7 @@ namespace QLNet
             First = ((OneFactorModel.Dynamics)model.second_.dynamics()).Process;
             Rho = model.Rho;
          }
-         public override double shortRate(double t, Vector variables)
+         public override double ShortRate(double t, Vector variables)
          {
             return ShortRate(t, variables[0], variables[1]);
          }
@@ -157,7 +157,7 @@ namespace QLNet
          {
             return x + y;
          }
-         public override double variable(double t, double r)
+         public override double Variable(double t, double r)
          {
             throw new NotImplementedException("On ne récupère pas la varible quand il y a deux facteurs");
          }
