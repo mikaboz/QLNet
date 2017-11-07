@@ -104,7 +104,7 @@ namespace QLNet
       private Option.Type type_;
       private VanillaOption option_;
 
-
+      public static void test2() { }
       public static void test() { }
       public class Export
       {
