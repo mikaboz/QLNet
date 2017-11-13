@@ -8,7 +8,7 @@ namespace QLNet
 {
    public class BlackTimeDeterministVarianceCurve : BlackVarianceTermStructure
    {
-      VolatilityModel model_;
+      public VolatilityModel model_;
       public BlackTimeDeterministVarianceCurve(VolatilityModel model, Date referenceDate,Calendar calendar,DayCounter dayCounter) :
          base(referenceDate,calendar,BusinessDayConvention.Following,dayCounter)
       {
@@ -62,13 +62,16 @@ namespace QLNet
       Handle<YieldTermStructure> riskFreeTermStructure_;
       Handle<YieldTermStructure> dividendeYieldTermStructure_;
       VolatilityModel volatilityModel_;
-      public BlackScholesModel(double s0, Handle<YieldTermStructure> riskFreeTermStructure, Handle<YieldTermStructure> dividendeYieldTermStructure, VolatilityModel volatilityModel) :
+      public BlackScholesModel(Handle<Quote> s0, Handle<YieldTermStructure> riskFreeTermStructure, Handle<YieldTermStructure> dividendeYieldTermStructure, Handle<BlackTimeDeterministVarianceCurve> volatilityTS) :
+         this(s0,riskFreeTermStructure,dividendeYieldTermStructure,volatilityTS.link.model_)
+      {}
+      public BlackScholesModel(Handle<Quote> s0, Handle<YieldTermStructure> riskFreeTermStructure, Handle<YieldTermStructure> dividendeYieldTermStructure, VolatilityModel volatilityModel) :
          base(volatilityModel.Arguments.Count)
       {
-         s0_ = new Handle<Quote>(new SimpleQuote(s0));
+         s0_ = s0;
          volatilityModel_ = volatilityModel;
          for (int i = 0; i < arguments_.Count; i++)
-            arguments_[i] = volatilityModel.Arguments[i];
+            arguments_[i] = volatilityModel_.Arguments[i];
 
          riskFreeTermStructure_ = riskFreeTermStructure;
          dividendeYieldTermStructure_ = dividendeYieldTermStructure;
