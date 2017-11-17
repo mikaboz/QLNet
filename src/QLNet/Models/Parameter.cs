@@ -108,32 +108,14 @@ namespace QLNet
          base(0.0)
       { }
    }
-   public class TimeDeterministParameter : Parameter
-   {
-      public TimeDeterministParameter(Func<double[], double, double> function, double[] parameters, Constraint constraint) :
-         base(parameters.Length, new TimeDeterministParameter.Impl(function), constraint)
-      {
-         for (int i = 0; i < params_.Count; i++)
-            params_[i] = parameters[i];
-      }
-      public new class Impl : Parameter.Impl
-      {
-         Func<double[], double, double> function_;
-         public Impl(Func<double[], double, double> function)
-         {
-            function_ = function;
-         }
-         public override double value(Vector p, double t)
-         {
-            return function_(p.ToArray(), t);
-         }
-      }
-   }
+   
    //! Piecewise-constant parameter
    //    ! \f$ a(t) = a_i if t_{i-1} \geq t < t_i \f$.
    //        This kind of parameter is usually used to enhance the fitting of a
    //        model
-   //    
+   //
+
+
    public class PiecewiseConstantParameter : Parameter
    {
       private new class Impl : Parameter.Impl

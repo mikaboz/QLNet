@@ -326,7 +326,7 @@ namespace QLNet {
               instruments_ = instruments;
               weights_ = weights;
               projection_ = projection;
-            penalization_ = penalization ?? new NullPenalization();
+              penalization_ = penalization ?? new NullPenalization();
            }
 
            public override double value( Vector p )
