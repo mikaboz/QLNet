@@ -19,7 +19,7 @@ using System.Collections.Generic;
 namespace QLNet
 {
    //! calibration helper for Equity models
-   public class VanillaOptionHelper : CalibrationHelper
+   public class VanillaOptionHelper : CalibrationHelper , IExportable
    {
       public VanillaOptionHelper( Period maturity,
                                 Calendar calendar,
@@ -104,6 +104,10 @@ namespace QLNet
       private Option.Type type_;
       private VanillaOption option_;
 
+      public void export(string path)
+      {
+         new Export(path).DoExport();
+      }
       public class Export
       {
          int k = 0;
@@ -145,5 +149,8 @@ namespace QLNet
       }
     }
 
-   
+   public interface IExportable
+   {
+      void export(string path);
+   }
 }

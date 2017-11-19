@@ -142,20 +142,6 @@ namespace QLNet
       }
    }
 
-   public class HandleExport<T> : Handle<T>
-      where T: IObservable
-   {
-      protected new class Link : Handle<T>.Link
-      {
-         public Link(T h) :
-            this(h,true)
-         { }
-         public Link(T h, bool registerAsObserver) :
-            base(h,registerAsObserver)
-         { }
-      }
-   }
-
 
 
    //! Relinkable handle to an observable

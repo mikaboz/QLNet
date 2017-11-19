@@ -274,43 +274,7 @@ namespace QLNet {
         }
 
 
-      public class PenalizationFunction
-      {
-         private double weight_;
-         private Impl impl_;
-         private Constraint constraint_;
-         protected PenalizationFunction(Impl impl, Constraint constraint, double weight = 1)
-         {
-            weight_ = weight;
-            impl_ = impl;
-            constraint_ = constraint;
-         }
-         public double Value(Vector v)
-         {
-            if (!constraint_.test(v))
-               return impl_.Value(v) * weight_;
-            else return 0;
-         }
-
-         public abstract class Impl
-         {
-            public abstract double Value(Vector v);
-         }
-      }
-      public class NullPenalization : PenalizationFunction
-      {
-         public NullPenalization() :
-            base(new NullPenalization.Impl(), new NoConstraint())
-         { }
-
-         public new class Impl : PenalizationFunction.Impl
-         {
-            public override double Value(Vector v)
-            {
-               return 0;
-            }
-         }
-      }
+      
 
       //! Calibration cost function class
       private class CalibrationFunction : CostFunction
@@ -388,6 +352,44 @@ namespace QLNet {
         }
         #endregion
     }
+
+   public class PenalizationFunction
+   {
+      private double weight_;
+      private Impl impl_;
+      private Constraint constraint_;
+      protected PenalizationFunction(Impl impl, Constraint constraint, double weight = 1)
+      {
+         weight_ = weight;
+         impl_ = impl;
+         constraint_ = constraint;
+      }
+      public double Value(Vector v)
+      {
+         if (!constraint_.test(v))
+            return impl_.Value(v) * weight_;
+         else return 0;
+      }
+
+      public abstract class Impl
+      {
+         public abstract double Value(Vector v);
+      }
+   }
+   public class NullPenalization : PenalizationFunction
+   {
+      public NullPenalization() :
+         base(new NullPenalization.Impl(), new NoConstraint())
+      { }
+
+      public new class Impl : PenalizationFunction.Impl
+      {
+         public override double Value(Vector v)
+         {
+            return 0;
+         }
+      }
+   }
 
    public abstract class ShortRateModel : CalibratedModel
    {
