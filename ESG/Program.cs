@@ -12,10 +12,13 @@ namespace ESG
    {
       static void Main(string[] args)
       {
-         ExponentialVSExponential();
+         BlackScholesCalibration.ExponentialVSExponential();
       }
+   }
 
-      static void ConstantVSConstant()
+   public static class BlackScholesCalibration
+   {
+      public static void ConstantVSConstant()
       {
          #region Global
          Calendar calendar = new TARGET();
@@ -76,7 +79,7 @@ namespace ESG
          ParametricVolatilityTermStructure volatilityTS = new ParametricVolatilityTermStructure(guessConstantVolatilityParameter, referenceDate, dayCounter, calendar);
          #endregion
 
-         BlackScholesModel model = new BlackScholesModel(spot,dividendTS,riskFreeTS,volatilityTS);
+         BlackScholesModel model = new BlackScholesModel(spot, dividendTS, riskFreeTS, volatilityTS);
          BlackScholesMertonProcess bsmProcess = model.process_;
          IPricingEngine engine = new AnalyticEuropeanEngine(bsmProcess);
          foreach (CalibrationHelper c in helpers)
@@ -108,7 +111,7 @@ namespace ESG
          Console.ReadLine();
          #endregion
       }
-      static void ConstantVSExponential()
+      public static void ConstantVSExponential()
       {
          #region Global
          Calendar calendar = new TARGET();
@@ -129,7 +132,7 @@ namespace ESG
          #endregion
 
          #region CalibrationHelpers
-         
+
          int[] timeToMaturity = new int[10];
          for (int i = 0; i < timeToMaturity.Length; i++)
          {
@@ -146,9 +149,9 @@ namespace ESG
          double B = 0.9;
          double beta = 0.2;
          Period horizon = new Period(timeToMaturity.Max(), timeUnit);
-         Parameter exponentialVolatilityParameter = new ExponentialVolatilityParameter(A, alpha, B, beta,horizon);
+         Parameter exponentialVolatilityParameter = new ExponentialVolatilityParameter(A, alpha, B, beta, horizon);
          ParametricVolatilityTermStructure exponentialVolatilityTS = new ParametricVolatilityTermStructure(exponentialVolatilityParameter, referenceDate, dayCounter, calendar);
-         BlackScholesModel generatorModel = new BlackScholesModel(spot, dividendTS, riskFreeTS,exponentialVolatilityTS);
+         BlackScholesModel generatorModel = new BlackScholesModel(spot, dividendTS, riskFreeTS, exponentialVolatilityTS);
          BlackScholesMertonProcess generatorBsmProcess = generatorModel.process_;
          IPricingEngine generatorEngine = new AnalyticEuropeanEngine(generatorBsmProcess);
          List<CalibrationHelper> helpers = new List<CalibrationHelper>();
@@ -204,7 +207,7 @@ namespace ESG
          Console.ReadLine();
          #endregion
       }
-      static void ExponentialVSConstant()
+      public static void ExponentialVSConstant()
       {
          #region Global
          Calendar calendar = new TARGET();
@@ -299,7 +302,7 @@ namespace ESG
          Console.ReadLine();
          #endregion
       }
-      static void ExponentialVSExponential()
+      public static void ExponentialVSExponential()
       {
          #region Global
          Calendar calendar = new TARGET();
@@ -339,7 +342,7 @@ namespace ESG
          Console.WriteLine("generatorsParameters:\nA: {0}\nalpha: {1}\nB: {2}\nbeta: {3}", A, alpha, B, beta);
          Period horizon = new Period(timeToMaturity.Max(), timeUnit);
          TimeDeterministParameter generatorExpVolatilityParameter = new ExponentialVolatilityParameter(A, alpha, B, beta, horizon);
-         Handle<BlackVolTermStructure> generatorExpVolatilityTS = new Handle<BlackVolTermStructure>( new ParametricVolatilityTermStructure(generatorExpVolatilityParameter, referenceDate, dayCounter, calendar));
+         Handle<BlackVolTermStructure> generatorExpVolatilityTS = new Handle<BlackVolTermStructure>(new ParametricVolatilityTermStructure(generatorExpVolatilityParameter, referenceDate, dayCounter, calendar));
          BlackScholesMertonProcess generatorBsmProcess = new BlackScholesMertonProcess(spot, dividendTS, riskFreeTS, generatorExpVolatilityTS);
          IPricingEngine generatorEngine = new AnalyticEuropeanEngine(generatorBsmProcess);
          List<CalibrationHelper> helpers = new List<CalibrationHelper>();
@@ -389,6 +392,197 @@ namespace ESG
          #region Results
          double[] output = model.parameters().ToArray();
          Console.WriteLine("output: ");
+         foreach (double d in output)
+            Console.WriteLine(d);
+         Console.ReadLine();
+         #endregion
+
+         #region BackTest
+         foreach (CalibrationHelper helper in helpers)
+         {
+            Console.WriteLine("marketValue: {0}\tmodelValue: {1}", helper.marketValue(), helper.modelValue());
+         }
+         Console.ReadLine();
+         #endregion
+      }
+   }
+
+   public static class HestonCalibration
+   {
+      public static void HestonVSConstant()
+      {
+         #region Global
+         Calendar calendar = new TARGET();
+         Date referenceDate = DateTime.Now;
+         DayCounter dayCounter = new Actual365Fixed();
+         #endregion
+
+         #region Stock
+         double spot_ = 100;
+         double flatDividend_ = 0.0;
+         Handle<Quote> spot = new Handle<Quote>(new SimpleQuote(spot_));
+         Handle<YieldTermStructure> dividendTS = new Handle<YieldTermStructure>(new FlatForward(referenceDate, flatDividend_, dayCounter));
+         #endregion
+
+         #region RiskFree
+         double flatRiskFreeRate_ = 0.01;
+         Handle<YieldTermStructure> riskFreeTS = new Handle<YieldTermStructure>(new FlatForward(referenceDate, flatRiskFreeRate_, dayCounter));
+         #endregion
+
+         #region CalibrationHelpers
+
+         int[] timeToMaturity = new int[10];
+         for (int i = 0; i < timeToMaturity.Length; i++)
+         {
+            timeToMaturity[i] = i + 1;
+         }
+         TimeUnit timeUnit = TimeUnit.Years;
+         double[] strike = new double[15];
+         for (int i = 0; i < strike.Length; i++)
+         {
+            strike[i] = 50 + 10 * i;
+         }
+         double constantVol = 0.1;
+         Handle<BlackVolTermStructure> constantVolTS = new Handle<BlackVolTermStructure>(new BlackConstantVol(referenceDate, calendar, constantVol, dayCounter));
+         BlackScholesMertonProcess generatorBsmProcess = new BlackScholesMertonProcess(spot, dividendTS, riskFreeTS, constantVolTS);
+         IPricingEngine generatorEngine = new AnalyticEuropeanEngine(generatorBsmProcess);
+         List<CalibrationHelper> helpers = new List<CalibrationHelper>();
+         for (int i = 0; i < timeToMaturity.Length; i++)
+            for (int j = 0; j < strike.Length; j++)
+            {
+               Period maturity = new Period(timeToMaturity[i], timeUnit);
+               StrikedTypePayoff payOff = new PlainVanillaPayoff(Option.Type.Call, strike[j]);
+               Exercise exercise = new EuropeanExercise(Settings.evaluationDate() + maturity);
+               VanillaOption option = new VanillaOption(payOff, exercise);
+               option.setPricingEngine(generatorEngine);
+               double price = option.NPV();
+               double impliedVol = option.impliedVolatility(price, generatorBsmProcess);
+               helpers.Add(new VanillaOptionHelper(maturity, calendar, spot, strike[j], new Handle<Quote>(new SimpleQuote(impliedVol)), riskFreeTS, dividendTS));
+            }
+         #endregion
+
+         #region Model
+         double v0 = 0.2;
+         double kappa = 0.1;
+         double theta = 0.9;
+         double sigma = 0.2;
+         double rho = 0.6;
+         HestonProcess hestonProcess = new HestonProcess(riskFreeTS, dividendTS, spot, v0, kappa, theta, sigma, rho);
+         HestonModel model = new HestonModel(hestonProcess);
+         IPricingEngine engine = new AnalyticHestonEngine(model);
+         foreach (CalibrationHelper c in helpers)
+            c.setPricingEngine(engine);
+         #endregion
+
+         #region Optimizer
+         OptimizationMethod LM = new LevenbergMarquardt();
+         EndCriteria endCriteria = new EndCriteria(100, 30, 10e-4, 10e-4, 10e-5);
+         #endregion
+
+         #region Calibration
+         model.calibrate(helpers, LM, endCriteria);
+         #endregion
+
+         #region Results
+         double[] output = model.parameters().ToArray();
+         foreach (double d in output)
+            Console.WriteLine(d);
+         Console.ReadLine();
+         #endregion
+
+         #region BackTest
+         foreach (CalibrationHelper helper in helpers)
+         {
+            Console.WriteLine("marketValue: {0}\tmodelValue: {1}", helper.marketValue(), helper.modelValue());
+         }
+         Console.ReadLine();
+         #endregion
+      }
+      public static void HestonVSHeston()
+      {
+         #region Global
+         Calendar calendar = new TARGET();
+         Date referenceDate = DateTime.Now;
+         DayCounter dayCounter = new Actual365Fixed();
+         #endregion
+
+         #region Stock
+         double spot_ = 100;
+         double flatDividend_ = 0.0;
+         Handle<Quote> spot = new Handle<Quote>(new SimpleQuote(spot_));
+         Handle<YieldTermStructure> dividendTS = new Handle<YieldTermStructure>(new FlatForward(referenceDate, flatDividend_, dayCounter));
+         #endregion
+
+         #region RiskFree
+         double flatRiskFreeRate_ = 0.01;
+         Handle<YieldTermStructure> riskFreeTS = new Handle<YieldTermStructure>(new FlatForward(referenceDate, flatRiskFreeRate_, dayCounter));
+         #endregion
+
+         #region CalibrationHelpers
+
+         int[] timeToMaturity = new int[10];
+         for (int i = 0; i < timeToMaturity.Length; i++)
+         {
+            timeToMaturity[i] = i + 1;
+         }
+         TimeUnit timeUnit = TimeUnit.Years;
+         double[] strike = new double[15];
+         for (int i = 0; i < strike.Length; i++)
+         {
+            strike[i] = 50 + 10 * i;
+         }
+         double v0 = 0.4;
+         double kappa = 0.2;
+         double theta = 0.3;
+         double sigma = 0.5;
+         double rho = 0.7;
+         Console.WriteLine("generatorsParameters:\nv0: {0}\nkappa: {1}\ntheta: {2}\nsigma: {3}\nrho: {4}", v0, kappa, theta, sigma, rho);
+         HestonProcess generatorHestonProcess = new HestonProcess(riskFreeTS, dividendTS, spot, v0, kappa, theta, sigma, rho);
+         HestonModel generatorHestonModel = new HestonModel(generatorHestonProcess);
+         IPricingEngine generatorEngine = new AnalyticHestonEngine(generatorHestonModel);
+         Handle<BlackVolTermStructure> hestonVolSurface = new Handle<BlackVolTermStructure>(new HestonBlackVolSurface(new Handle<HestonModel>(generatorHestonModel)));
+         GeneralizedBlackScholesProcess gbsProcess = new GeneralizedBlackScholesProcess(spot, dividendTS, riskFreeTS, hestonVolSurface);
+         List<CalibrationHelper> helpers = new List<CalibrationHelper>();
+         for (int i = 0; i < timeToMaturity.Length; i++)
+            for (int j = 0; j < strike.Length; j++)
+            {
+               Period maturity = new Period(timeToMaturity[i], timeUnit);
+               StrikedTypePayoff payOff = new PlainVanillaPayoff(Option.Type.Call, strike[j]);
+               Exercise exercise = new EuropeanExercise(Settings.evaluationDate() + maturity);
+               VanillaOption option = new VanillaOption(payOff, exercise);
+               option.setPricingEngine(generatorEngine);
+               double price = option.NPV();
+               double impliedVol = option.impliedVolatility(price, gbsProcess);
+               helpers.Add(new VanillaOptionHelper(maturity, calendar, spot, strike[j], new Handle<Quote>(new SimpleQuote(impliedVol)), riskFreeTS, dividendTS));
+            }
+         #endregion
+
+         #region Model
+         double guessv0 = 0.2;
+         double guesskappa = 0.1;
+         double guesstheta = 0.9;
+         double guesssigma = 0.2;
+         double guessrho = 0.6;
+         Console.WriteLine("guess:\nv0: {0}\nkappa: {1}\ntheta: {2}\nsigma: {3}\nrho: {4}", guessv0, guesskappa, guesstheta, guesssigma, guessrho);
+         HestonProcess hestonProcess = new HestonProcess(riskFreeTS, dividendTS, spot, guessv0, guesskappa, guesstheta, guesssigma, guessrho);
+         HestonModel model = new HestonModel(hestonProcess);
+         IPricingEngine engine = new AnalyticHestonEngine(model);
+         foreach (CalibrationHelper c in helpers)
+            c.setPricingEngine(engine);
+         #endregion
+
+         #region Optimizer
+         OptimizationMethod LM = new LevenbergMarquardt();
+         EndCriteria endCriteria = new EndCriteria(100, 30, 10e-4, 10e-4, 10e-5);
+         #endregion
+
+         #region Calibration
+         PenalizationFunction penalization = new HestonModel.Penalization(model, 10e8, 1);
+         model.calibrate(helpers, LM, endCriteria,null,null,null,penalization);
+         #endregion
+
+         #region Results
+         double[] output = model.parameters().ToArray();
          foreach (double d in output)
             Console.WriteLine(d);
          Console.ReadLine();

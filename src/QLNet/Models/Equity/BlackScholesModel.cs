@@ -70,6 +70,16 @@ namespace QLNet
             }
             public bool test(Vector parameter)
             {
+               Vector initialValue = new Vector(1, horizon_ / 2);
+               Constraint boundaryConstraint = new BoundaryConstraint(0, horizon_);
+               Problem problem = new Problem(new CostFunctionImpl(functionImpl_, parameter),boundaryConstraint, initialValue);
+               EndCriteria endCriteria = new EndCriteria(100, null, 10e-4, 10e-4, null);
+               LevenbergMarquardt lm = new LevenbergMarquardt();
+               lm.minimize(problem, endCriteria);
+               double minimum = problem.value(problem.currentValue());
+               Console.WriteLine(minimum);
+               return minimum > 0;
+               /*
                Brent brent = new Brent();
                brent.setMaxEvaluations(100);
                //Test si la valeur initiale est négative
@@ -89,7 +99,9 @@ namespace QLNet
                   return true;
                }
                return false;
+               */
             }
+            /*
             public class Solver : ISolver1d
             {
                public Vector parameters_;
@@ -102,6 +114,30 @@ namespace QLNet
                public override double value(double t)
                {
                   return functionImpl_.value(parameters_, t);
+               }
+            }
+            */
+            public class CostFunctionImpl : CostFunction
+            {
+               public TimeDeterministParameter.Impl function_;
+               public Vector parameters_;
+               public CostFunctionImpl(TimeDeterministParameter.Impl function, Vector parameters)
+               {
+                  function_ = function;
+                  parameters_ = parameters;
+               }
+               public override double value(Vector x)
+               {
+                  double t = x[0];
+                  return function_.value(parameters_,t);
+               }
+               public override Vector values(Vector x)
+               {
+                  Vector v = new Vector(1)
+                  {
+                     [0] = value(x)
+                  };
+                  return v;
                }
             }
          }
