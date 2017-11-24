@@ -6,22 +6,49 @@ using System.Threading.Tasks;
 
 namespace QLNet
 {
-   public class ConstantVolatilityParameter : ConstantParameter
+   public interface IParametricVolatility
+   {
+      double IntegratedSquareValue(double t, double T);
+   }
+   public class ConstantVolatilityParameter : ConstantParameter, IParametricVolatility
    {
       public ConstantVolatilityParameter(double constantVol) :
          base(constantVol, new PositiveConstraint())
       { }
-
-   }
-   public class TimeDeterministParameter : Parameter
-   {
-      public Period horizon_;
-      public double Horizon { get { return ((PositivityConstraint)constraint_).Horizon; } }
-      protected TimeDeterministParameter(Impl impl, Period horizon) :
-         base(impl.Size, impl, new  PositivityConstraint(impl))
+      public double IntegratedSquareValue(double t, double T)
       {
+         double vol = value(0);
+         return vol * vol * (T-t);
+      }
+   }
+   public abstract class TimeDeterministParameter : Parameter, IParametricVolatility
+   {
+      private GlobalPositivityConstraint globalPositivityConstraint_;
+      public Period horizon_;
+      public void SetHorizon(double horizon)
+      {
+         if (globalPositivityConstraint_ != null)
+            globalPositivityConstraint_.SetHorizon(horizon);
+      }
+      public double? Horizon
+      {
+         get
+         {
+            return globalPositivityConstraint_?.Horizon;
+         }
+      }
+      protected TimeDeterministParameter(Impl impl, Period horizon, bool needGlobalPositivity)
+      {
+         impl_ = impl;
          params_ = impl.params_;
          horizon_ = horizon;
+         
+         if (needGlobalPositivity)
+         {
+            globalPositivityConstraint_ = new GlobalPositivityConstraint((Impl)impl_, horizon);
+            constraint_ = globalPositivityConstraint_;
+         }
+         else constraint_ = new NoConstraint();
       }
       public double IntegratedSquareValue(double t, double T)
       {
@@ -35,22 +62,34 @@ namespace QLNet
          {
             params_ = new Vector(size);
          }
-         public abstract double IntegratedSquareValue(Vector p, double t, double T);
+         public override double value(Vector p, double t)
+         {
+            CheckAndAdaptValue(ref t, p);
+            return valueImpl(p, t);
+         }
+         public virtual void CheckAndAdaptValue(ref double t, Vector p) {  }
+         public abstract double valueImpl(Vector p, double t);
+         public virtual void CheckAndAdaptIntegrability(ref double t, ref double T, Vector p) { }
+         public double IntegratedSquareValue(Vector p, double t, double T)
+         {
+            CheckAndAdaptIntegrability(ref t, ref T, p);
+            return IntegratedSquareValueImpl(p, t, T);
+         }
+         public abstract double IntegratedSquareValueImpl(Vector p, double t, double T);
       }
-      // test si aux paramètres fixés, pour tout t dans [0,T], sigma(t) > 0
-      public class PositivityConstraint : Constraint
+      private class GlobalPositivityConstraint : Constraint
       {
-         public double Horizon { get { return ((Impl)impl_).horizon_; } }
+         public double? Horizon { get { return ((Impl)impl_).horizon_; } }
          public void SetHorizon(double horizon)
          {
             ((Impl)impl_).SetHorizon(horizon);
          }
-         public PositivityConstraint(TimeDeterministParameter.Impl functionImpl) :
+         public GlobalPositivityConstraint(TimeDeterministParameter.Impl functionImpl, Period Horizon) :
             base(new Impl(functionImpl))
          { }
          public class Impl : IConstraint
          {
-            public double horizon_ = double.MaxValue;
+            public double? horizon_;
             public TimeDeterministParameter.Impl functionImpl_;
             public Impl(TimeDeterministParameter.Impl functionImpl)
             {
@@ -70,53 +109,21 @@ namespace QLNet
             }
             public bool test(Vector parameter)
             {
-               Vector initialValue = new Vector(1, horizon_ / 2);
-               Constraint boundaryConstraint = new BoundaryConstraint(0, horizon_);
-               Problem problem = new Problem(new CostFunctionImpl(functionImpl_, parameter),boundaryConstraint, initialValue);
-               EndCriteria endCriteria = new EndCriteria(100, null, 10e-4, 10e-4, null);
+               if (horizon_ == null)
+                  throw new ArgumentNullException("null horizon, must be set from termStructure and more specificly from ParametricVolatilityTermStructure");
+               double horizon = (double)horizon_;
+               Vector initialValue = new Vector(1, horizon / 2);
+               Constraint boundaryConstraint = new BoundaryConstraint(0, horizon);
+               Problem problem = new Problem(new CostFunctionImpl(functionImpl_, parameter), boundaryConstraint, initialValue);
+               EndCriteria endCriteria = new EndCriteria(100, null, 10e-4, 10e-4, null );
                LevenbergMarquardt lm = new LevenbergMarquardt();
                lm.minimize(problem, endCriteria);
                double minimum = problem.value(problem.currentValue());
-               Console.WriteLine(minimum);
-               return minimum > 0;
-               /*
-               Brent brent = new Brent();
-               brent.setMaxEvaluations(100);
-               //Test si la valeur initiale est négative
-               if (functionImpl_.value(parameter, 0) < 0)
-               {
-                  return false;
-               }
-               // Alors la volatilité initiale est potivie
-               // Dans ce cas, si on trouve un 0 c'est que la volatilité change de signe et passe néfative
-               try
-               {
-                  brent.solve(new Solver(functionImpl_, parameter), 10e-4, horizon_ / 2, 0, horizon_);
-               }
-               // Si on ne trouve pas de 0, une exception est alors générée
-               catch (ArgumentException e)
-               {
-                  return true;
-               }
-               return false;
-               */
+               bool test = minimum > 0;
+               Console.WriteLine("GlobalPositivityConstraint: " + test);
+               return test;
             }
-            /*
-            public class Solver : ISolver1d
-            {
-               public Vector parameters_;
-               public TimeDeterministParameter.Impl functionImpl_;
-               public Solver(TimeDeterministParameter.Impl functionImpl, Vector parameters)
-               {
-                  functionImpl_ = functionImpl;
-                  parameters_ = parameters;
-               }
-               public override double value(double t)
-               {
-                  return functionImpl_.value(parameters_, t);
-               }
-            }
-            */
+           
             public class CostFunctionImpl : CostFunction
             {
                public TimeDeterministParameter.Impl function_;
@@ -129,7 +136,8 @@ namespace QLNet
                public override double value(Vector x)
                {
                   double t = x[0];
-                  return function_.value(parameters_,t);
+                  double value = function_.value(parameters_,t);
+                  return value;
                }
                public override Vector values(Vector x)
                {
@@ -142,17 +150,44 @@ namespace QLNet
             }
          }
       }
-      public void SetHorizon(double horizon)
-      {
-         ((PositivityConstraint)constraint_).SetHorizon(horizon);
-      }
    }
-
+   /// <summary>
+   /// if c belongs to [-inf,-1[ : polynomial
+   /// if c = 1 : linear
+   /// if c belongs to ]-1,0[ : sqrt
+   /// if = 0 : constr
+   /// if c belongs to ]0,1[ : inverse and 0 - integrable
+   /// ifc belongs to [1,+inf[ : inverse and not-0-integrable : TO PREVENT
+   /// </summary>
    public class InverseVolatilityParameter : TimeDeterministParameter
    {
-      public InverseVolatilityParameter(double a, double b, double c, Period horizon) :
-         base(new Impl(a,b,c),horizon)
-      {}
+      public enum FormConstraint { NoSpecific, Polynomial, Inverse, Sqrt }
+      public InverseVolatilityParameter(double a, double b, double c, Period horizon, FormConstraint formConstraint = FormConstraint.NoSpecific) :
+         base(new Impl(a,b,c),horizon,true)
+      {
+         Constraint integrability = new IntegrabilityConstraintImpl(this.params_);
+         Constraint form = new FormConstraintImpl(formConstraint, params_);
+         Constraint composite = new CompositeConstraint(integrability, form);
+         constraint_ = new CompositeConstraint(constraint_, composite);
+      }
+      public bool CheckParameters(FormConstraint formConstraint)
+      {
+         double c = params_[2];
+         switch (formConstraint)
+         {
+            case FormConstraint.Inverse:
+               return c > 0 & c < 1;
+            case FormConstraint.Polynomial:
+               return c <= 1;
+            case FormConstraint.Sqrt:
+               return c >= 1 && c <= 0;
+            case FormConstraint.NoSpecific:
+               return true;
+            default:
+               throw new NotSupportedException("not support form Constraint in checking parameters");
+         }
+      }
+      
       public new class Impl : TimeDeterministParameter.Impl
       {
          public Impl(double a, double b, double c) :
@@ -163,29 +198,73 @@ namespace QLNet
             params_[2] = c;
          }
 
-         public override double IntegratedSquareValue(Vector p, double t_, double T_)
+         public override double IntegratedSquareValueImpl(Vector p, double t, double T)
          {
             double A = p[0];
             double B = p[1];
             double C = p[2];
-            double t = (t_ == 0) ? (t_ + 0.0001) : t_;
-            double T = (T_ == 0) ? (T_ + 0.0001) : T_;
+            if (C >= 1)
+               throw new NotSupportedException("c into inverseVolatilityParameter doesn't belong to ]-inf,1[ : integrability constraint did not impact");
+            //double t = (t_ == 0) ? (t_ + 0.0001) : t_;
+            //double T = (T_ == 0) ? (T_ + 0.0001) : T_;
             return A * (T - t) + 2 * B * A * (Math.Pow(T, 1 - C) - Math.Pow(t, 1 - C)) / (1 - C) + B * B * (Math.Pow(T, 1 - 2 * C) - Math.Pow(t, 1 - 2 * C)) / (1 - 2 * C);
          }
-         public override double value(Vector p, double t)
+         public override void CheckAndAdaptValue(ref double t, Vector p)
          {
-            double t_ = (t == 0) ? (t + 0.0001) : t;
+            double c = p[2];
+            t = (t == 0&& c>=0) ? t + QLNet.Const.QL_EPSILON : t;
+         }
+         public override double valueImpl(Vector p, double t)
+         {
             double A = p[0];
             double B = p[1];
             double C = p[2];
-            return A + B / Math.Pow(t_, C);
+            return A + B / Math.Pow(t, C);
+         }
+      }
+      public class FormConstraintImpl : ProjectedIndividualConstraint
+      {
+         private static Constraint SelectedConstraint(FormConstraint form)
+         {
+            switch (form)
+            {
+               case FormConstraint.Inverse:
+                  return new BoundaryConstraint(0, double.MaxValue);
+               case FormConstraint.Polynomial:
+                  return new BoundaryConstraint(double.MinValue, -1);
+               case FormConstraint.Sqrt:
+                  return new BoundaryConstraint(-1, 0);
+               default:
+                  throw new NotSupportedException("Not support formConstraint");
+            }
+         }
+         public FormConstraintImpl(FormConstraint formConstraint, Vector parameters) :
+            base(SelectedConstraint(formConstraint),parameters,2)
+         { }
+         public override bool test(Vector p)
+         {
+            bool test = base.test(p);
+            Console.WriteLine("formConstraint: " + test);
+            return test;
+         }
+      }
+      public class IntegrabilityConstraintImpl : ProjectedIndividualConstraint
+      {
+         public IntegrabilityConstraintImpl(Vector parameters) :
+            base(new ExtendedBoundaryConstraint(double.MinValue,1, true, true),parameters,2)
+         { }
+         public override bool test(Vector p)
+         {
+            bool test = base.test(p);
+            Console.WriteLine("IntegrabilityConstraint: " + test);
+            return test;
          }
       }
    }
    public class ExponentialVolatilityParameter : TimeDeterministParameter
    {
       public ExponentialVolatilityParameter(double A, double alpha, double B, double beta, Period horizon) :
-         base(new Impl(A,alpha,B,beta),horizon)
+         base(new Impl(A,alpha,B,beta),horizon,true)
       { }
       public new class Impl : TimeDeterministParameter.Impl
       {
@@ -198,7 +277,7 @@ namespace QLNet
             params_[3] = beta;
          }
 
-         public override double IntegratedSquareValue(Vector p, double t, double T)
+         public override double IntegratedSquareValueImpl(Vector p, double t, double T)
          {
             double A = p[0];
             double alpha = p[1];
@@ -208,7 +287,7 @@ namespace QLNet
                 + 2 * A * B * (Math.Exp(-(alpha + beta) * t) - Math.Exp(-(alpha + beta) * T)) / (alpha + beta)
                 + B * B * (Math.Exp(-2 * beta * t) - Math.Exp(-2 * beta * T)) / (2 * beta);
          }
-         public override double value(Vector p, double t)
+         public override double valueImpl(Vector p, double t)
          {
             double A = p[0];
             double alpha = p[1];
@@ -218,10 +297,11 @@ namespace QLNet
          }
       }
    }
-
    public class ParametricVolatilityTermStructure : BlackVarianceTermStructure
    {
-      public Period Horizon { get
+      public Period Horizon
+      {
+         get
          {
             if (parameter_ is TimeDeterministParameter timeDeterministParameter)
                return timeDeterministParameter.horizon_;
@@ -229,10 +309,10 @@ namespace QLNet
          }
       }
       public Parameter parameter_;
-      public ParametricVolatilityTermStructure(Parameter p, Date referenceDate, DayCounter dayCounter, Calendar calendar, BusinessDayConvention bdc = BusinessDayConvention.Following) :
+      public ParametricVolatilityTermStructure(IParametricVolatility p, Date referenceDate, DayCounter dayCounter, Calendar calendar, BusinessDayConvention bdc = BusinessDayConvention.Following) :
          base(referenceDate,calendar,bdc,dayCounter)
       {
-         parameter_ = p;
+         parameter_ = (Parameter)p;
          if (parameter_ is TimeDeterministParameter timeDetermisitParameter)
             timeDetermisitParameter.SetHorizon(timeFromReference(maxDate()));
       }
@@ -253,26 +333,19 @@ namespace QLNet
       }
       protected override double blackVarianceImpl(double t, double strike)
       {
-         if (parameter_ is TimeDeterministParameter timeDeterministParameter)
-            return timeDeterministParameter.IntegratedSquareValue(0, t);
-         else if (parameter_ is ConstantParameter constantParameter)
-         {
-            double vol = constantParameter.value(t);
-            return vol * vol * t;
-         }
-         else throw new NotSupportedException("not supported Parameter type");
+         return ((IParametricVolatility)parameter_).IntegratedSquareValue(0, t);
       }
    }
-
+   
    public class BlackScholesModel : CalibratedModel
    {
-      public BlackScholesMertonProcess process_;
+      public GeneralizedBlackScholesProcess process_;
       public BlackScholesModel(Handle<Quote> spot, Handle<YieldTermStructure> dividendTS,  Handle<YieldTermStructure> riskFreeTS, ParametricVolatilityTermStructure volatilityTS) :
          base(1)
       {
          arguments_[0] = volatilityTS.parameter_;
          Handle<BlackVolTermStructure> blackVolTS = new Handle<BlackVolTermStructure>(volatilityTS);
-         process_ = new BlackScholesMertonProcess(spot, dividendTS, riskFreeTS, blackVolTS);
+         process_ = new GeneralizedBlackScholesProcess(spot, dividendTS, riskFreeTS, blackVolTS);
          blackVolTS.registerWith(update);
       }
    }

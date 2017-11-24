@@ -167,6 +167,160 @@ namespace QLNet
       }
    }
 
+   //! %Constraint imposing all arguments to be in [low,high] with optional open or close brackets
+   public class ExtendedBoundaryConstraint : Constraint
+   {
+      public ExtendedBoundaryConstraint(double low, double high, bool openLow = false, bool openHigh=false)
+         : base(new ExtendedBoundaryConstraint.Impl(low, high,openLow,openHigh))
+      {}
+
+      private class Impl : IConstraint
+      {
+         public class Borne
+         {
+            public enum Side { Inf, Sup}
+            public Side side_;
+            public bool open_;
+            public double value_;
+            public Borne(double value, bool open, Side side)
+            {
+               open_ = open;
+               value_ = value;
+               side_ = side;
+            }
+            public bool Test(double value)
+            {
+               switch (side_)
+               {
+                  case Side.Inf:
+                     if (value > value_)
+                        return true;
+                     else if (value == value_)
+                        return !open_;
+                     else return false;
+                  case Side.Sup:
+                     if (value < value_)
+                        return true;
+                     else if (value == value_)
+                        return !open_;
+                     else return false;
+                  default:
+                     throw new NotSupportedException("borne type not supported");
+               }
+            }
+         }
+         private Borne low_;
+         private Borne high_;
+        
+         public Impl(double low, double high, bool openLow, bool openHigh)
+         {
+            low_ = new Borne(low, openLow,Borne.Side.Inf);
+            high_ = new Borne(high, openHigh, Borne.Side.Sup);
+         }
+         public bool test(Vector v)
+         {
+            for (int i = 0; i < v.Count; i++)
+            {
+               if (!(low_.Test(v[i]) && high_.Test(v[i])))
+                  return false;
+            }
+            return true;
+         }
+
+         public Vector upperBound(Vector parameters)
+         {
+            return new Vector(parameters.size(), high_.value_);
+         }
+         public Vector lowerBound(Vector parameters)
+         {
+            return new Vector(parameters.size(), low_.value_);
+         }
+      }
+   }
+
+   //! %Constraint imposing all arguments to be in a [low,high] vector with optional open or close brackets
+   public class ExtendedNonhomogeneousBoundaryConstraint : Constraint
+   {
+      public ExtendedNonhomogeneousBoundaryConstraint(Vector low, Vector high, bool[] openLow, bool[] openHigh)
+         : base(new ExtendedNonhomogeneousBoundaryConstraint.Impl(low, high, openLow, openHigh))
+      {}
+
+      private class Impl : IConstraint
+      {
+         public class Borne
+         {
+            public enum Side { Inf, Sup }
+            public Side side_;
+            public bool open_;
+            public double value_;
+            public Borne(double value, bool open, Side side)
+            {
+               open_ = open;
+               value_ = value;
+               side_ = side;
+            }
+            public bool Test(double value)
+            {
+               switch (side_)
+               {
+                  case Side.Inf:
+                     if (value > value_)
+                        return true;
+                     else if (value == value_)
+                        return !open_;
+                     else return false;
+                  case Side.Sup:
+                     if (value < value_)
+                        return true;
+                     else if (value == value_)
+                        return !open_;
+                     else return false;
+                  default:
+                     throw new NotSupportedException("borne type not supported");
+               }
+            }
+
+            public static Vector ToVector(Borne[] bornes)
+            {
+               Vector v = new Vector(bornes.Length);
+               for (int i = 0; i < v.size(); i++)
+                  v[i] = bornes[i].value_;
+               return v;
+            }
+         }
+         private Borne[] low_;
+         private Borne[] high_;
+
+         public Impl(Vector low, Vector high, bool[] openLow, bool[] openHigh)
+         {
+            low_ = new Borne[low.size()];
+            high_ = new Borne[high.size()];
+               for (int i = 0; i < low.size(); i++)
+            {
+               low_[i] = new Borne(low[i], openLow[i], Borne.Side.Inf);
+               high_[i] = new Borne(high[i], openHigh[i], Borne.Side.Sup);
+            }
+         }
+         public bool test(Vector v)
+         {
+            for (int i = 0; i < v.Count; i++)
+            {
+               if (!(low_[i].Test(v[i]) && !high_[i].Test(v[i])))
+                  return false;
+            }
+            return true;
+         }
+         public Vector upperBound(Vector parameters)
+         {
+            return Borne.ToVector(high_);
+         }
+         public Vector lowerBound(Vector parameters)
+         {
+            return Borne.ToVector(low_);
+         }
+      }
+   }
+
    //! %Constraint enforcing both given sub-constraints
    public class CompositeConstraint : Constraint
    {

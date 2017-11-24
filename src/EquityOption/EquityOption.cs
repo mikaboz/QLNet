@@ -238,7 +238,7 @@ namespace EquityOption {
             // Monte Carlo Method: QMC (Sobol)
             method = "QMC (Sobol)";
             int nSamples = 32768;  // 2^15
-
+         
             IPricingEngine mcengine2 = new MakeMCEuropeanEngine<LowDiscrepancy>(bsmProcess)
                                             .withSteps(timeSteps)
                                             .withSamples(nSamples)
@@ -251,7 +251,7 @@ namespace EquityOption {
 
             // Monte Carlo Method: MC (Longstaff Schwartz)
             method = "MC (Longstaff Schwartz)";
-            IPricingEngine mcengine3 = new MakeMCAmericanEngine<PseudoRandom>(bsmProcess)
+         IPricingEngine mcengine3 = new MakeMCAmericanEngine<PseudoRandom>(bsmProcess)
                                         .withSteps(100)
                                         .withAntitheticVariate()
                                         .withCalibrationSamples(4096)

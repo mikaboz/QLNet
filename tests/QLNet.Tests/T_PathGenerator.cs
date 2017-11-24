@@ -68,13 +68,13 @@ namespace TestSuite
             ulong seed = 42;
             double length = 10;
             int timeSteps = 12;
-
+         
             var rsg = (InverseCumulativeRsg<RandomSequenceGenerator<MersenneTwisterUniformRng>
                                                                     ,InverseCumulativeNormal>)
                        new PseudoRandom().make_sequence_generator(timeSteps, seed);
 
          
-
+         
             PathGenerator<IRNG> generator = new PathGenerator<IRNG>(process, 
                                                                     length, 
                                                                     timeSteps,

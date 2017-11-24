@@ -7,9 +7,28 @@ namespace QLNet
 {
    public static class ListExtension
    {
+      /// <summary>
+      /// No replace sampling
+      /// </summary>
+      public static List<T> Sample<T>(this List<T> list)
+      {
+         List<int> index = Enumerable.Range(0, list.Count).ToList();
+         List<T> output = new List<T>();
+         Random random = new Random();
+         int indexCount = index.Count;
+         for (int i = 0; i < indexCount; i++)
+         {
+            int k = random.Next(0, index.Count - 1);
+            int listIndex = index[k];
+            index.Remove(listIndex);
+            output.Add(list[listIndex]);
+         }
+         return output;
+      }
       //    list: List<T> to resize
       //    size: desired new size
       //    element: default value to insert
+
 
       public static void Resize<T>( this List<T> list, int size, T element = default(T) )
       {

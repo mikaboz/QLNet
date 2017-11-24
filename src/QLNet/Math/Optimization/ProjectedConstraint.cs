@@ -14,57 +14,96 @@
 //  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 //  FOR A PARTICULAR PURPOSE.  See the license for more details.
 
+using System;
 using System.Collections.Generic;
 
 namespace QLNet
 {
    public class ProjectedConstraint : Constraint
    {
+      public enum Mode { Inclusive, Exclusive }
       private class Impl : IConstraint 
       {
          public Impl( Constraint constraint,
                       Vector parameterValues,
-                      List<bool>fixParameters)
+                      List<bool>fixParameters, Mode mode)
 
          {
             constraint_ = constraint;
             projection_ = new Projection(parameterValues, fixParameters);
+            mode_ = mode;
          }
 
-         public Impl( Constraint constraint, Projection projection)
+         public Impl( Constraint constraint, Projection projection,Mode mode)
          {
             constraint_ = constraint;
             projection_ = projection;
+            mode_ = mode;
          }
-            
+
+         public Vector ProjectAccordingToMode(Vector parameters)
+         {
+            Vector projectedVector;
+            switch (mode_)
+            {
+               case Mode.Inclusive:
+                  projectedVector = projection_.include(parameters);
+                  break;
+               case Mode.Exclusive:
+                  projectedVector = projection_.project(parameters);
+                  break;
+               default:
+                  throw new NotSupportedException("Not supported Mode of projection");
+            }
+            return projectedVector;
+         }
          public bool test(Vector parameters) 
          {
-            return constraint_.test(projection_.include(parameters));
+            return constraint_.test(ProjectAccordingToMode(parameters));
          }
             
          public Vector upperBound(Vector parameters) 
          {
-            return constraint_.upperBound(projection_.include(parameters));
+            return constraint_.upperBound(ProjectAccordingToMode(parameters));
          }
             
          public Vector lowerBound(Vector parameters) 
          {
-            return constraint_.lowerBound(projection_.include(parameters));
+            return constraint_.lowerBound(ProjectAccordingToMode(parameters));
          }
 
+          private Mode mode_;
           private Constraint constraint_;
           private Projection projection_;
       }
 
       public ProjectedConstraint( Constraint constraint,
                                   Vector parameterValues,
-                                  List<bool> fixParameters)
-         : base( new Impl(constraint, parameterValues,fixParameters)) 
+                                  List<bool> fixParameters,Mode mode = Mode.Inclusive)
+         : base( new Impl(constraint, parameterValues,fixParameters,mode)) 
       {}
 
-      public ProjectedConstraint( Constraint constraint, Projection projection)
-            : base(new Impl(constraint, projection)) 
+      public ProjectedConstraint( Constraint constraint, Projection projection, Mode mode = Mode.Inclusive)
+            : base(new Impl(constraint, projection,mode)) 
       {}
+   }
 
+   public class ProjectedIndividualConstraint : ProjectedConstraint
+   {
+      private static List<bool> GenerateList(Vector parameterValues, int toTestIndex)
+      {
+         if (toTestIndex >= parameterValues.Count)
+            throw new NotSupportedException("index to test must be include in vector size");
+         List<bool> fixedParameters = new InitializedList<bool>(parameterValues.Count, true)
+         {
+            [toTestIndex] = false
+         };
+         return fixedParameters;
+      }
+      public ProjectedIndividualConstraint(Constraint constraint,
+                                  Vector parameterValues,
+                                  int toTestIndex)
+         : base(constraint,parameterValues,GenerateList(parameterValues,toTestIndex),Mode.Exclusive)
+      { }
    }
 }
