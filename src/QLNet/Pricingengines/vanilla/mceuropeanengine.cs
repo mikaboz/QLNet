@@ -166,4 +166,5 @@ namespace QLNet
       private PlainVanillaPayoff payoff_;
       private double discount_;
    }
+
 }

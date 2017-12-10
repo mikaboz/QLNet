@@ -28,10 +28,10 @@ namespace QLNet
              positive times? Investigate and see whether we
              can use it for negative ones as well.
    */
-
    public class TimeGrid
    {
-      private List<double> times_;
+      protected List<double> times_;
+      public List<double> Times() { return times_; }
 
       public double this[int i]
       {
@@ -52,6 +52,7 @@ namespace QLNet
          return mandatoryTimes_;
       }
 
+      protected TimeGrid() { }
       public TimeGrid(double end, int steps)
       {
          // We seem to assume that the grid begins at 0.
@@ -219,6 +220,7 @@ namespace QLNet
       public bool empty()
       {
          return times_.Count == 0;
+
       }
 
       public int size()
@@ -236,4 +238,56 @@ namespace QLNet
          return times_.Last();
       }
    }
+  
+
+   /*
+   public class UniformTimeGrid : TimeGrid
+   {
+      public UniformTimeGrid(double end, int steps) :
+         base(end,steps)
+      {}
+   }
+   */
+   /*
+   public class SequenceTimeGrid : TimeGrid
+   {
+      public List<TimeGrid> timeGrids_;
+
+      public TimeGrid TimeGrid(int i)
+      {
+         return timeGrids_[i];
+      }
+
+      public int SequenceSize() { return timeGrids_.Count + 1; }
+
+      public SequenceTimeGrid(List<TimeGrid> timeGrids, double firstPeriodTime, List<double> phasis) :
+         base()
+      {
+         Console.WriteLine("timegridsCount: " + timeGrids.Count);
+         Console.ReadLine();
+         timeGrids_ = timeGrids;
+         Utils.QL_REQUIRE(phasis.Count == timeGrids.Count - 1, () => "phasis vector must size be timeGrids.size - 1");
+         times_ = new List<double>();
+         times_.Add(0);
+         TimeGrid firstGrid = timeGrids_.First();
+         for (int i = 0; i < firstGrid.size(); i++)
+         {
+            firstGrid.Times()[i] += firstPeriodTime;
+            times_.Add(firstGrid[i]);
+         }
+         for (int j = 1; j<timeGrids_.Count;j++)
+         {
+            double lastValue = times_.Last();
+            for (int i = 0; i < timeGrids_[j].size(); i++)
+            {
+               timeGrids_[j].Times()[i+1] += lastValue + phasis[j-1];
+               if (i!= 0) times_.Add(timeGrids_[j][i]);
+            }
+         }
+         foreach (double d in times_)
+            Console.WriteLine(d);
+         Console.ReadLine();
+      }
+   }
+   */
 }

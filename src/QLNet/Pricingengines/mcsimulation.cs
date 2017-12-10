@@ -32,6 +32,7 @@ namespace QLNet
    */
    public abstract class McSimulation<MC, RNG, S> where S : IGeneralStatistics, new()
    {
+
       protected McSimulation( bool antitheticVariate, bool controlVariate )
       {
          antitheticVariate_ = antitheticVariate;
@@ -47,7 +48,6 @@ namespace QLNet
             mcModel_.addSamples( minSamples - sampleNumber );
             sampleNumber = mcModel_.sampleAccumulator().samples();
          }
-
          int nextBatch;
          double order;
          double error = mcModel_.sampleAccumulator().errorEstimate();
@@ -75,7 +75,6 @@ namespace QLNet
       //! simulate a fixed number of samples
       public double valueWithSamples( int samples )
       {
-
          int sampleNumber = mcModel_.sampleAccumulator().samples();
 
          Utils.QL_REQUIRE( samples >= sampleNumber,()=>

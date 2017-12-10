@@ -18,6 +18,10 @@
  FOR A PARTICULAR PURPOSE.  See the license for more details.
 */
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace QLNet
 {
    //! General-purpose Monte Carlo model for path samples
@@ -38,6 +42,11 @@ namespace QLNet
    */
    public class MonteCarloModel<MC, RNG, S> where S : IGeneralStatistics
    {
+      protected MonteCarloModel(IPathGenerator<IRNG> pathGenerator, bool antitheticVariate)
+      {
+         pathGenerator_ = pathGenerator;
+         isAntitheticVariate_ = antitheticVariate;
+      }
       public MonteCarloModel( IPathGenerator<IRNG> pathGenerator, PathPricer<IPath> pathPricer, 
          S sampleAccumulator,bool antitheticVariate, PathPricer<IPath> cvPathPricer = null, 
          double cvOptionValue = 0,IPathGenerator<IRNG> cvPathGenerator = null)
@@ -111,4 +120,53 @@ namespace QLNet
       private IPathGenerator<IRNG> cvPathGenerator_;
 
    }
+
+   /*
+   public class MultiMonteCarloModel<MC, RNG, S> : MonteCarloModel<MC,RNG,S>where S : IGeneralStatistics
+   {
+      public MultiMonteCarloModel(IPathGenerator<IRNG> pathGenerator, List<PathPricer<IPath>> pathPricer,
+         List<S> sampleAccumulator, bool antitheticVariate) :
+         base(pathGenerator,antitheticVariate)
+      {
+         Utils.QL_REQUIRE(pathPricer.Count == sampleAccumulator.Count, () => "path pricer and sampleAccumulator must have the same size");
+         pathPricer_ = pathPricer;
+         sampleAccumulator_ = sampleAccumulator;
+      }
+
+      public new void addSamples(int samples)
+      {
+         for (int j = 1; j <= samples; j++)
+         {
+
+            Sample<IPath> path = pathGenerator_.next();
+            List<double> price = new InitializedList<double>(pathPricer_.Count);
+            for (int i= 0; i<price.Count;i++)
+               price[i] = pathPricer_[i].value(path.value);
+
+            if (isAntitheticVariate_)
+            {
+               path = pathGenerator_.antithetic();
+               List<double> price2 = new InitializedList<double>(pathPricer_.Count);
+               for (int i = 0; i<price2.Count;i++)
+                  price2[i] = pathPricer_[i].value(path.value);
+
+               for (int i = 0; i < sampleAccumulator_.Count; i++)
+                  sampleAccumulator_[i].add((price[i] + price2[i]) / 2.0, path.weight);
+            }
+            else
+            {
+               for (int i = 0; i < sampleAccumulator_.Count; i++)
+                  sampleAccumulator_[i].add(price[i], path.weight);
+            }
+         }
+      }
+      public new List<S> sampleAccumulator() { return sampleAccumulator_; }
+
+      private IPathGenerator<IRNG> pathGenerator_;
+      private List<PathPricer<IPath>> pathPricer_;
+      private List<S> sampleAccumulator_;
+      private bool isAntitheticVariate_;
+   }
+   */
+
 }

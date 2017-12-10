@@ -203,9 +203,8 @@ namespace QLNet {
                "sample size mismatch: " + dimension_ + " required, " + begin.Count + " provided");
 
             quadraticSum_ += weight * Matrix.outerProduct(begin, begin);
-
-            for (int i=0; i<dimension_; ++i)
-                stats_[i].add(begin[i], weight);        
+         for (int i = 0; i < dimension_; ++i)
+            stats_[i].add(begin[i], weight);
         }
     }
 

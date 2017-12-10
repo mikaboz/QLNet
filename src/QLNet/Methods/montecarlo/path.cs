@@ -75,6 +75,7 @@ namespace QLNet {
         //! time grid
         public TimeGrid timeGrid() { return timeGrid_; }
 
+      public Vector values() { return values_; }
         // ICloneable interface
         public object Clone() {
             Path temp = (Path)this.MemberwiseClone();

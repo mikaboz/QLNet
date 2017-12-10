@@ -22,11 +22,13 @@ using System.Collections.Generic;
 
 namespace QLNet
 {
-	//! liquid market instrument used during calibration
-	public abstract class CalibrationHelper : LazyObject
-	{
-
-
+   //! liquid market instrument used during calibration
+   public abstract class CalibrationHelper : LazyObject
+   {
+      public void SetCalibrationErrorType(CalibrationErrorType calibrationErrorType)
+      {
+         calibrationErrorType_ = calibrationErrorType;
+      }
       public enum CalibrationErrorType
 		{
 			RelativePriceError, PriceError, ImpliedVolError

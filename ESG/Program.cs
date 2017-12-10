@@ -12,6 +12,7 @@ namespace ESG
    {
       static void Main(string[] args)
       {
+         BlackScholesCalibration.ConstantVSConstant();
       }
    }
 
