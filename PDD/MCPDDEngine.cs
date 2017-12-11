@@ -20,6 +20,8 @@ namespace PDD
       private bool brownianBridge_;
       ulong seed_;
 
+      bool startWithConditonalPeriod_ = false;
+
       // constructor
       public MCPDDEngine(
            GeneralizedBlackScholesProcess process,
@@ -73,7 +75,7 @@ namespace PDD
             double dt = conditionalPeriodTime / (double)stepsPerConditionalPeriod_;
             for (int i = 0; i < stepsPerConditionalPeriod_; i++)
                times.Add(times.Last() - dt);
-            return new PDDTimeGrid(times, stepsPerConditionalPeriod_, true);
+            return new TimeGrid(times);//PDDTimeGrid(times, stepsPerConditionalPeriod_, true);
          }
          while (lowerDate > evaluationDate)
          {
@@ -90,7 +92,8 @@ namespace PDD
          }
          times.Add(0);
          times.Reverse();
-         return new PDDTimeGrid(times, stepsPerConditionalPeriod_,false);
+         startWithConditonalPeriod_ = true;
+         return new TimeGrid(times);
       }
       /*
       protected override TimeGrid timeGrid()
@@ -280,7 +283,7 @@ namespace PDD
          GeneralizedBlackScholesProcess process = process_ as GeneralizedBlackScholesProcess;
          Utils.QL_REQUIRE(process != null, () => "Black-Scholes process required");
 
-         return new PDDPathPricer(payoff, process.riskFreeRate().link.discount(timeGrid().Last()));
+         return new PDDPathPricer(payoff, process.riskFreeRate().link.discount(timeGrid().Last()),stepsPerConditionalPeriod_,startWithConditonalPeriod_);
       
       }
 

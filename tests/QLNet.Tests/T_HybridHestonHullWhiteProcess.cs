@@ -290,7 +290,9 @@ namespace TestSuite
 
          HybridHestonHullWhiteProcess jointProcess = new HybridHestonHullWhiteProcess(hestonProcess, hwProcess, -0.4);
 
-         TimeGrid grid = new TimeGrid(times,times.Count - 1);
+         List<double> time2 = new List<double>(times); //
+         time2.RemoveAt(time2.Count);                      //
+         TimeGrid grid = new TimeGrid(time2);// times,times.Count - 1);
 
          int factors = jointProcess.factors();
          int steps = grid.size() - 1;
@@ -668,7 +670,7 @@ namespace TestSuite
          for (int i = 0; i <= maturity; ++i)
             times[i] = i;
 
-         TimeGrid grid  = new TimeGrid(times,times.Count);
+         TimeGrid grid = new TimeGrid(times);//,times.Count);
 
          List<double> redemption = new InitializedList<double>(maturity);
          for (int i = 0; i < maturity; ++i)

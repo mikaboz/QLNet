@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using QLNet;
 namespace PDD
 {
+   public class TESTTT { }
    public class MCBarriereEngine<RNG, S> : McSimulation<SingleVariate, RNG, S>, IGenericEngine
       where RNG : IRSG, new()
       where S : IGeneralStatistics, new()
@@ -96,7 +97,6 @@ namespace PDD
 
       protected override PathPricer<IPath> pathPricer()
       {
-
          PlainVanillaPayoff payoff = arguments_.payoff as PlainVanillaPayoff;
          if (payoff == null)
             throw new NotSupportedException("Plain vanilla payoff needed");

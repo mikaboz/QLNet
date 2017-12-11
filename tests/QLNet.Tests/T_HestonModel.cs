@@ -1067,7 +1067,7 @@ namespace TestSuite
             List<double> modelTimes = new List<double>();
             modelTimes.Add(0.25);
             modelTimes.Add(10.0);
-            TimeGrid modelGrid = new TimeGrid(modelTimes,modelTimes.Count);
+            TimeGrid modelGrid = new TimeGrid(modelTimes); //,modelTimes.Count);
 
             double v0 = 0.1;
             ConstantParameter sigma = new ConstantParameter(0.5,new PositiveConstraint());
